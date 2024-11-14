@@ -55,7 +55,6 @@ jobs:
           git pull origin master
           python -m pip install --upgrade pip
           pip install -r src/data_cleaner/requirements.txt
-          python -m src.data_cleaner.data_transformation
   deploy_categorization:
     runs-on: ubuntu-latest
     env:
