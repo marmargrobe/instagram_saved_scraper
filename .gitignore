@@ -5,3 +5,13 @@ properties.txt
 *.csv
 *.ipynb
 .env
+
+# Ignore Python bytecode
+__pycache__/
+
+# Ignore virtual environment directories
+.venv/
+
+# Ignore IDE-specific files
+.vscode/
+.idea/
