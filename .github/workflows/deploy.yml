@@ -59,10 +59,13 @@ jobs:
         host: ${{ secrets.EC2_PUBLIC_IP }}
         username: ec2-user
         key: ${{ secrets.EC2_PRIVATE_KEY }}
+        # script: |
+        #   git pull origin master
+        #   python -m pip install --upgrade pip
+        #   pip install -r src/data_cleaner/requirements.txt
         script: |
-          git pull origin master
-          python -m pip install --upgrade pip
-          pip install -r src/data_cleaner/requirements.txt
+          echo "Testing connection to EC2 instance"
+          echo "Connected to EC2 instance successfully"
     
    
   # deploy_categorization:
