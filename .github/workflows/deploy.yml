@@ -45,7 +45,7 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
-        role-to-assume: arn:aws:iam::149536452725:role/github_actions_mars
+        role-to-assume: arn:aws:iam::149536452725:role/github-actions
         aws-region: us-west-1
     
     - name: Set up Python
