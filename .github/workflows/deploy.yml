@@ -38,9 +38,9 @@ jobs:
     # env:
     #   AWS_REGION: us-west-1
     steps:
-    - name: Get Github action IP
-      id: ip
-      uses: haythem/public-ip@v1.2
+    # - name: Get Github action IP
+    #   id: ip
+    #   uses: haythem/public-ip@v1.2
 
     # - name: Setting environment variables..
     #   run: |
@@ -55,11 +55,11 @@ jobs:
     #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
-        role-to-assume: arn:aws:iam::149536452725:role/github_actions_mars
+        role-to-assume: arn:aws:iam::149536452725:role/github-actions
         aws-region: us-west-1
     
     - name: Set up Python
