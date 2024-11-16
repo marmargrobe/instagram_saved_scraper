@@ -52,22 +52,31 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: '3.12.7'
-  
-    - name: SSH into EC2 and deploy transformations
-      uses: appleboy/ssh-action@v0.1.4
+    
+    - name: Execute commands via AWS SSM
+      uses: aws-actions/aws-ssm-send-command@v1
       with:
-        host: ${{ secrets.EC2_PUBLIC_IP }}
-        username: ec2-user
-        key: ${{ secrets.EC2_PRIVATE_KEY }}
-        port: 22
-        debug: true
-        # script: |
-        #   git pull origin master
-        #   python -m pip install --upgrade pip
-        #   pip install -r src/data_cleaner/requirements.txt
-        script: |
-          echo "Testing connection to EC2 instance"
-          echo "Connected to EC2 instance successfully"
+        document-name: AWS-RunShellScript
+        targets: |
+          Key=instanceIds,Values=i-00705919789ee0222
+        parameters: |
+          commands=["cd /repos/instagram_saved_scraper && git pull origin master && pip install -r requirements.txt"]
+  
+    # - name: SSH into EC2 and deploy transformations
+    #   uses: appleboy/ssh-action@v0.1.4
+    #   with:
+    #     host: ${{ secrets.EC2_PUBLIC_IP }}
+    #     username: ec2-user
+    #     key: ${{ secrets.EC2_PRIVATE_KEY }}
+    #     port: 22
+    #     debug: true
+    #     # script: |
+    #     #   git pull origin master
+    #     #   python -m pip install --upgrade pip
+    #     #   pip install -r src/data_cleaner/requirements.txt
+    #     script: |
+    #       echo "Testing connection to EC2 instance"
+    #       echo "Connected to EC2 instance successfully"
     
    
   # deploy_categorization:
