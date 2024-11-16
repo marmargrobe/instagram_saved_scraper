@@ -53,15 +53,25 @@ jobs:
       with:
         python-version: '3.12.7'
     
-    - name: Execute commands via AWS SSM
-      uses: aws-actions/aws-ssm-send-command@v1
-      with:
-        document-name: AWS-RunShellScript
-        targets: |
-          Key=instanceIds,Values=i-00705919789ee0222
-        parameters: |
-          commands=["cd /repos/instagram_saved_scraper && git pull origin master && pip install -r requirements.txt"]
+    - name: Install AWS CLI
+      run: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install
   
+    - name: Send command to EC2 instance via SSM
+      run: |
+        # Replace with your EC2 instance ID
+        INSTANCE_ID="i-00705919789ee0222"
+        COMMAND="cd /repos/instagram_saved_scraper && git pull origin master && pip install -r requirements.txt"
+
+        # Send the command using AWS SSM
+        aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters "commands=$COMMAND" \
+          --timeout-seconds 600 \
+          --region us-west-1
     # - name: SSH into EC2 and deploy transformations
     #   uses: appleboy/ssh-action@v0.1.4
     #   with:
