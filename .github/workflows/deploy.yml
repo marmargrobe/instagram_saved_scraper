@@ -34,7 +34,7 @@ jobs:
   #         python scraper.py  # Run the scraper
 
   deploy_transformations:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     env:
       AWS_REGION: us-west-2 
     steps:
@@ -49,7 +49,7 @@ jobs:
         
     - name: Add Github Actions IP to Security group
       run: |
-        aws ec2 authorize-security-group-ingress --group-name ${{ env.AWS_SG_NAME }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32    
+        aws ec2 authorize-security-group-ingress --group-name default --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32    
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -86,50 +86,50 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_DEFAULT_REGION: ${{ env.AWS_DEFAULT_REGION }}
       if: always()
-  deploy_categorization:
-    runs-on: ubuntu-latest
-    env:
-      AWS_REGION: us-west-2 
-    steps:
-    - name: Get Github action IP
-      id: ip
-      uses: haythem/public-ip@v1.2
+  # deploy_categorization:
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     AWS_REGION: us-west-2 
+  #   steps:
+  #   - name: Get Github action IP
+  #     id: ip
+  #     uses: haythem/public-ip@v1.2
 
-    - name: Setting environment variables..
-      run: |
-        echo "AWS_DEFAULT_REGION=ap-southeast-1" &gt;&gt; $GITHUB_ENV
-        echo "AWS_SG_NAME=default" &gt;&gt; $GITHUB_ENV
+  #   - name: Setting environment variables..
+  #     run: |
+  #       echo "AWS_DEFAULT_REGION=ap-southeast-1" &gt;&gt; $GITHUB_ENV
+  #       echo "AWS_SG_NAME=default" &gt;&gt; $GITHUB_ENV
         
-    - name: Add Github Actions IP to Security group
-      run: |
-        aws ec2 authorize-security-group-ingress --group-name ${{ env.AWS_SG_NAME }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32    
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    - name: Checkout code
-      uses: actions/checkout@v2
+  #   - name: Add Github Actions IP to Security group
+  #     run: |
+  #       aws ec2 authorize-security-group-ingress --group-name ${{ env.AWS_SG_NAME }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32    
+  #     env:
+  #       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #   - name: Checkout code
+  #     uses: actions/checkout@v2
     
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.12.7'
+  #   - name: Set up Python
+  #     uses: actions/setup-python@v2
+  #     with:
+  #       python-version: '3.12.7'
   
-    - name: SSH into EC2 and deploy categorization
-      uses: appleboy/ssh-action@v0.1.4
-      with:
-        host: ${{ secrets.EC2_PUBLIC_IP }}
-        username: mars
-        key: ${{ secrets.EC2_PRIVATE_KEY }}
-        script: |
-          git pull origin master
-          python -m pip install --upgrade pip
-          pip install -r src/data_cleaner/requirements.txt
-          python -m src.data_cleaner.data_categorization
-    - name: Remove Github Actions IP from security group
-      run: |
-        aws ec2 revoke-security-group-ingress --group-name ${{ env.AWS_SG_NAME }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_DEFAULT_REGION: ${{ env.AWS_DEFAULT_REGION }}
-      if: always()
+  #   - name: SSH into EC2 and deploy categorization
+  #     uses: appleboy/ssh-action@v0.1.4
+  #     with:
+  #       host: ${{ secrets.EC2_PUBLIC_IP }}
+  #       username: mars
+  #       key: ${{ secrets.EC2_PRIVATE_KEY }}
+  #       script: |
+  #         git pull origin master
+  #         python -m pip install --upgrade pip
+  #         pip install -r src/data_cleaner/requirements.txt
+  #         python -m src.data_cleaner.data_categorization
+  #   - name: Remove Github Actions IP from security group
+  #     run: |
+  #       aws ec2 revoke-security-group-ingress --group-name ${{ env.AWS_SG_NAME }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+  #     env:
+  #       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       AWS_DEFAULT_REGION: ${{ env.AWS_DEFAULT_REGION }}
+  #     if: always()
