@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-permission:
+permissions:
   id-token: write
 jobs:
   # deploy_scraper:
