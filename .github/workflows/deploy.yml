@@ -67,9 +67,10 @@ jobs:
   
     - name: Send command to EC2 instance via SSM
       run: |
-        # Replace with your EC2 instance ID
         INSTANCE_ID="i-00705919789ee0222"
         COMMAND="cd /repos/instagram_saved_scraper && git pull origin master && pip install -r requirements.txt"
+        
+        aws ec2 describe-instances
 
         # Send the command using AWS SSM
         aws ssm send-command \
