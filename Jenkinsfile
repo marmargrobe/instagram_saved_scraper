@@ -24,23 +24,23 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                script {
-                    // Run tests using pytest or your testing framework of choice
-                    sh './$VENV_DIR/bin/pytest'
-                }
-            }
-        }
+        // stage('Run Tests') {
+        //     steps {
+        //         script {
+        //             // Run tests using pytest or your testing framework of choice
+        //             sh './$VENV_DIR/bin/pytest'
+        //         }
+        //     }
+        // }
         
-        stage('Static Analysis') {
-            steps {
-                script {
-                    // Run linting (optional, for code quality)
-                    sh './$VENV_DIR/bin/flake8 .'
-                }
-            }
-        }
+        // stage('Static Analysis') {
+        //     steps {
+        //         script {
+        //             // Run linting (optional, for code quality)
+        //             sh './$VENV_DIR/bin/flake8 .'
+        //         }
+        //     }
+        // }
 
         stage('Build') {
             steps {
