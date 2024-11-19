@@ -5,25 +5,26 @@ from src.data_cleaner.utils_categorization import DataProcessor
 
 option_1 = True
 option_2 = False
-top_n = 5
+# Set processing flags
+process_hastags = True
+process_caption_text = True
+process_city = True
+process_location_list = True
+process_location_name = True
+process_lng_lat = True
+process_usertags = True
+
+top_n = 7
 if option_1:
     # Initialize the session factory
     Session = sessionmaker(bind=engine, expire_on_commit=False)
 
-    # Set processing flags
-    process_hastags = True
-    process_caption_text = False
-    process_city = False
-    process_location_list = False
-    process_location_name = False
-    process_lng_lat = False
-    process_usertags = False
 
     # Use session in a context manager
     with Session() as session:
         # Initialize DataProcessor with the session and categories
         processor = DataProcessor(session=session, number_of_categories=top_n)
-
+        
         # Processing logic for each type, based on flags
         if process_hastags:
             lookup_col = 'hashtags'
@@ -55,15 +56,6 @@ if option_1:
 elif option_2:
     # Initialize the session factory
     Session = sessionmaker(bind=engine)
-
-    # Set processing flags
-    process_hastags = True
-    process_caption_text = False
-    process_city = False
-    process_location_list = False
-    process_location_name = False
-    process_lng_lat = False
-    process_usertags = False
 
     # Create and manage session manually with try...finally
     session = Session()

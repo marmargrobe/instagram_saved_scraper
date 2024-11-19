@@ -39,7 +39,14 @@ class DataProcessor:
         - A list of unique categories for classification.
         """
         rawstd_collections = self.session.query(RawstdInstaSavedCollection).distinct().all()
-        return [x.name for x in rawstd_collections]
+        ignore_collections = [ 'All posts', 'Watch later', 'Templates']
+        keep_collections = ["Travel Europe", "Travel South America", "Travel US", "Travel National Parks"]
+        for x in rawstd_collections:
+            if x.name not in ignore_collections:
+                keep_collections.append(x.name)
+
+        return keep_collections
+    
 
 
 
