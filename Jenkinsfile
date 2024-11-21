@@ -24,14 +24,13 @@ pipeline {
             }
         }
 
-        // stage('Run Tests') {
-        //     steps {
-        //         script {
-        //             // Run tests using pytest or your testing framework of choice
-        //             sh './$VENV_DIR/bin/pytest'
-        //         }
-        //     }
-        // }
+        stage('Decrypt Env') {
+            steps {
+                script {
+                    sh 'gpg -d .env.gpg > .env'
+                }
+            }
+        }
         
         // stage('Static Analysis') {
         //     steps {
@@ -50,7 +49,26 @@ pipeline {
                 }
             }
         }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t $DOCKER_IMAGE:$DOCKER_TAG .'
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    // Login to Docker registry (Docker Hub, AWS ECR, etc.)
+                    sh 'docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD'
+                    sh 'docker push $DOCKER_IMAGE:$DOCKER_TAG'
+                }
+            }
+        }
     }
+
 
     post {
         always {

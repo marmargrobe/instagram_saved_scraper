@@ -1,0 +1,36 @@
+# Use an official Python image as a base image
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the project files to the working directory
+COPY . /app
+
+# Copy the .env file
+COPY .env /app/.env
+
+# Update and install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install and create a virtual environment
+RUN python -m venv venv
+
+# Activate virtual environment and install Python dependencies
+RUN . /app/venv/bin/activate && \
+    pip install --upgrade pip && \
+    pip install -r src/data_cleaner/requirements.txt
+
+# Make sure the virtual environment is activated for future commands
+ENV PATH="/app/venv/bin:$PATH"
+
+# Run the Python script
+CMD ["python", "-m", "src.data_cleaner.data_categorization"]

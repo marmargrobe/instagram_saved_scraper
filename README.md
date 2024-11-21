@@ -85,3 +85,32 @@ _____________
 This script heavily relies on https://github.com/dilame/instagram-private-api library for Instagram API functions like logging in, getting posts etc. Thanks to the developer(s)!
 
 
+## Docker
+
+`docker build -t data-category .`
+`docker images`
+
+`docker run -it <image id>`
+
+`   docker run --gpus all -it --rm your-image-name python your_script.py`
+
+
+Build base image:
+`docker build -f Dockerfile.base -t data-cleaner .`
+
+Build individual images:
+`docker build -f Dockerfile.city -t city_category .`
+`docker build -f Dockerfile.lng_lat -t lng_lat_category .`
+`docker build -f Dockerfile.location_list -t loc_list_category .`
+`docker build -f Dockerfile.hashtags -t hashtags_category .`
+`docker build -f Dockerfile.location_name -t location_name_category .`
+`docker build -f Dockerfile.usertags -t usertags_category .`
+
+Run individual images:
+`docker run --gpus all -it city_category`
+`docker run --gpus all -it lng_lat_category`
+`docker run --gpus all -it loc_list_category`
+`docker run --gpus all -it hashtags_category`
+`docker run --gpus all -it location_name_category`
+`docker run --gpus all -it usertags_category`
+

@@ -1,0 +1,5 @@
+# Use the base image
+FROM data-cleaner
+
+# Set the command specific to this project
+CMD ["python", "-m", "src.data_cleaner.data_categorization"]

@@ -21,7 +21,7 @@ Include the smallest last_updated timestamp or an identifier to inform the consu
 
 """
 
-use_instagrapi = False
+use_instagrapi = True
 if use_instagrapi:
     # Load credentials from environment variables
     username = os.getenv('INSTAGRAM_USERNAME')
@@ -50,7 +50,7 @@ if use_instagrapi:
 
     all_posts_pk = insta_client.api.collection_pk_by_name("All posts")
 
-    all_saved_medias = fetch_all_saved_medias(insta_client, all_posts_pk, total_medias)
+    all_saved_medias = fetch_all_saved_medias(insta_client, all_posts_pk, total_medias, batch_size=200)
 
 
     for media in all_saved_medias:
