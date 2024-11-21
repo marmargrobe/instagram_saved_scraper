@@ -19,7 +19,7 @@ Include the smallest last_updated timestamp or an identifier to inform the consu
 
 """
 
-use_instagrapi = False
+use_instagrapi = True
 if use_instagrapi:
 
     # Load credentials from environment variables

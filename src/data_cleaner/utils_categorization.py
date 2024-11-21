@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, text
 from transformers import pipeline
 from datetime import datetime
 import numpy as np
@@ -10,7 +11,7 @@ from datetime import datetime
 from transformers import pipeline
 
 class DataProcessor:
-    __version__ = "1.0.6"  # Version number of the DataProcessor class
+    __version__ = "1.0.8"  # Version number of the DataProcessor class
 
     def __init__(self, session: Session, categories=[], number_of_categories=3, destination_table_class=CleanInstaSavedReelsCategories, source_table_class=CleanInstaSavedReel):
         """
@@ -85,24 +86,43 @@ class DataProcessor:
 
         return ["Uncategorized"]
 
-
+    def get_all_records_from_source_table_class(self, version, lookup_cols):
+        if version == "":
+            return self._get_all_records_from_source_table_class()
+        else:
+            return self._get_all_records_from_source_table_class_not_in_destination_table(version=version, lookup_cols=lookup_cols)
     
-    def get_records_from_source_table_class(self,):
+    def _get_all_records_from_source_table_class(self,):
         # return all records if batch_size is 0
         return self.session.query(self.source_table_class).all()
+    
+    def _get_all_records_from_source_table_class_not_in_destination_table(self, version, lookup_cols):
+        lookup_cols_str = ','.join("'{0}'".format(x) for x in lookup_cols)
+        processed_records = self.session.query(self.destination_table_class.id).filter(
+            and_(
+                self.destination_table_class.processor_version == version,
+            #  self.destination_table_class.processor_input["lookup_cols"] == [lookup_cols])
+                text(f"processor_input->>'lookup_cols' = {lookup_cols_str}"))
+        )
+        print(processed_records)
+        data_to_compute = (self.session.query(self.source_table_class).filter(self.source_table_class.id.not_in(processed_records)))
+        
+        print(data_to_compute)
+        return data_to_compute.all()
+
 
     def get_records_from_source_table_class_batch(self, offset=0, batch_size=100):
         return self.session.query(self.source_table_class).offset(offset).limit(batch_size).all()
 
 
-    def process_full(self, lookup_col, insert_into_table=False, insert_type="single"):
+    def process_full(self, lookup_col, insert_into_table=True, insert_type="single", specific_version_only=''):
         """
         Process all records in the table at once, updating metadata columns in the table.
 
         param:
         - insert_type: "single" or "bulk"
         """
-        print(self.categories)
+        
         insert_single = False
         insert_bulk = False
         if insert_into_table:
@@ -116,8 +136,14 @@ class DataProcessor:
         last_updated_time = datetime.now()
         method_name = f"{self.__class__.__name__}.{self.process_full.__name__}"
         
-        # Retrieve all records
-        records = self.get_records_from_source_table_class()
+        # Retrieve records
+        if specific_version_only == "current":
+            specific_version = self.__version__
+        else:
+            specific_version = specific_version_only
+        print(specific_version)
+        records = self.get_all_records_from_source_table_class(version=specific_version,lookup_cols=lookup_col)
+        print(f"Records to process: {str(len(records))}")
         processed_data = []
         for record in records:
             current_record = {

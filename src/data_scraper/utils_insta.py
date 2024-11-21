@@ -42,10 +42,9 @@ class InstaClient:
         cookie_expiry = datetime.datetime.fromtimestamp(self.api.cookie_dict.get('auth_expires', 0))
         return cookie_expiry.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-def fetch_all_saved_medias(insta_client, collection_pk, total_medias):
+def fetch_all_saved_medias(insta_client, collection_pk, total_medias, batch_size=100):
     all_medias = []
     last_media_pk = 0
-    batch_size = 100  # Adjust the batch size as necessary
 
     while len(all_medias) < total_medias:
         # Fetch the media for the current batch
