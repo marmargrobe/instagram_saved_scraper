@@ -1,10 +1,17 @@
 # Use NVIDIA CUDA base image with Ubuntu 22.04
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
-# Install Python 3.12 and other dependencies
+# Set environment variable to prevent tzdata from prompting for input
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=America
+
+# Install software-properties-common for add-apt-repository
 RUN apt-get update && \
     apt-get install -y --no-install-recommends software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
+    rm -rf /var/lib/apt/lists/*
+
+# Add deadsnakes PPA for Python 3.12
+RUN add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
     python3.12 \
@@ -12,7 +19,8 @@ RUN apt-get update && \
     python3-pip \
     libpq-dev \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    tzdata && \
+    rm -rf /var/lib/apt/lists/*
 
 # Set Python 3.12 as the default python and pip version
 RUN ln -s /usr/bin/python3.12 /usr/local/bin/python && \
@@ -26,7 +34,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Copy the project files to the working directory
-COPY src/* /app/src
+COPY src/ /app/src
 
 # Copy the .env file
 COPY .env /app/.env
@@ -41,3 +49,5 @@ RUN python -m venv venv && \
 # Make sure the virtual environment is activated for future commands
 ENV PATH="/app/venv/bin:$PATH"
 
+# Specify the command to run your Python application
+CMD ["python", "-m", "src.data_cleaner.data_categorization"]

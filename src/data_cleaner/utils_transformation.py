@@ -2,6 +2,7 @@ import pandas as pd
 import ast
 import re
 
+
 # Function to safely convert the location string into a dictionary
 def parse_dict_object(object_str):
     if pd.isna(object_str):  # Handle NaN values
@@ -19,8 +20,6 @@ def extract_key(dict_value, key):
     # Access the 'city' key in the location dictionary
     return dict_value.get(key, None)
 
-
-
 # Function to extract hashtags
 def extract_hashtags(text):
     # Ensure the text is a string (convert NaN or non-string to an empty string)
@@ -29,10 +28,6 @@ def extract_hashtags(text):
         return hashtags
     else:
         return []  # Return an empty list for non-string values
-
-
-
-# Assuming all_reels is a list of InstaSavedReel instances
 
 # Define a function to extract a specific key from a dictionary
 def extract_key(obj, key):
@@ -50,3 +45,13 @@ def extract_key(obj, key):
 #     return None
 
 
+# check if caption_text has GPE
+# create list with locations_from_caption
+
+def extract_location_from_caption(text, nlp):
+    doc = nlp(text)
+    location_list = []
+    for entity in doc.ents:
+        if entity.label_ == 'GPE':
+            location_list.append(entity.text)
+    return location_list
