@@ -104,6 +104,7 @@ class CleanInstaSavedReel(Base):
     city = Column(String)
     location_name = Column(String)
     user_pk = Column(String(50))
+    locations_from_caption = Column(ARRAY(String))
 
 class CleanInstaUser(Base):
     __tablename__ = 'insta_user'

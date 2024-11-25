@@ -1,9 +1,10 @@
 """
 Any additional transformation scripts will go here. For instance, you could have one that aggregates the data or another that normalizes or filters it.
 """
-from src.data_cleaner.utils_transformation import parse_dict_object, extract_key, extract_hashtags
+from src.data_cleaner.utils_transformation import parse_dict_object, extract_key, extract_hashtags, extract_location_from_caption
 from sqlalchemy.orm import sessionmaker
 from src.helper.model import engine, CleanInstaSavedReel, RawstdInstaSavedReel, CleanInstaUser, CleanInstaUserTag
+import spacy
 
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -15,23 +16,23 @@ try:
 finally:
     # Close the session
     session.close()
-print(len(rawstd_insta_saved_reels))
 
 compute_transformations = False
-
 # switch on which transformations to do
-compute_extract_hashtags = True
-compute_extract_locations = True
-compute_extract_user = True
-compute_extract_usertagged = True
+compute_extract_hashtags = False
+compute_extract_locations = False
+compute_extract_user = False
+compute_extract_usertagged = False
+compute_extract_locations_from_caption = False
 
-
+# compute_extract_hashtags = True
+# compute_extract_locations = True
+# compute_extract_user = True
+# compute_extract_usertagged = True
+compute_extract_locations_from_caption = True
 
 if len(rawstd_insta_saved_reels) > 0:
     compute_transformations = True
-
-    # convert fetched data into dataframe
-
 if compute_transformations:
     if compute_extract_user:
         # id VARCHAR(50) PRIMARY KEY,
@@ -49,10 +50,6 @@ if compute_transformations:
             reel.user_username = extract_key(parsed_user, 'username') if parsed_user is not None else None
             reel.user_full_name = extract_key(parsed_user, 'full_name') if parsed_user is not None else None
             reel.user_profile_pic_url = extract_key(parsed_user, 'profile_pic_url') if parsed_user is not None else None
-
-        
-
-
     if compute_extract_usertagged:
         # id VARCHAR(50) PRIMARY KEY,
         # username VARCHAR(50),
@@ -77,17 +74,9 @@ if compute_transformations:
                 reel.usertagged_username = None
                 reel.usertagged_full_name = None
                 reel.usertagged_profile_pic_url = None
-        # df['parsed_usertagged'] = df['user'].apply(parse_dict_object)
-
-        # df['usertagged_id'] = df['usertagged']['user']['pk']
-        # df['usertagged_username'] = df['usertagged']['user']['username']
-        # df['usertagged_full_name'] = df['usertagged']['user']['full_name']
-        # df['usertagged_profile_pic_url'] = df['usertagged']['user']['profile_pic_url']
-
     if compute_extract_hashtags:
         # Apply the function to the 'caption_text' column
         # Function to extract hashtags from a caption text
-        
 
         # Manipulate the `all_reels` objects to add hashtags
         for reel in rawstd_insta_saved_reels:
@@ -96,7 +85,14 @@ if compute_transformations:
                 reel.hashtags = extract_hashtags(reel.caption_text)
             else:
                 reel.hashtags = []
-        # df['hashtags'] = df['caption_text'].apply(extract_hashtags)
+    if compute_extract_locations_from_caption:
+        nlp = spacy.load('en_core_web_sm')
+        for reel in rawstd_insta_saved_reels:
+            # Ensure caption_text exists, then extract hashtags
+            if hasattr(reel, 'caption_text'):
+                reel.locations_from_caption = extract_location_from_caption(reel.caption_text, nlp)
+            else:
+                reel.locations_from_caption = []
 
     # function to extract location data
     if compute_extract_locations:
@@ -111,12 +107,6 @@ if compute_transformations:
             reel.location_name = extract_key(reel.parsed_location, 'name') if reel.parsed_location else None
             reel.lng = extract_key(reel.parsed_location, 'lng') if reel.parsed_location else None
             reel.lat = extract_key(reel.parsed_location, 'lat') if reel.parsed_location else None
-
-        # df['parsed_location'] = df['location'].apply(parse_dict_object)
-        # df['city'] = df['parsed_location'].apply(lambda x: extract_key(x, "city") if x is not None else None)
-        # df['location_name'] = df['parsed_location'].apply(lambda x: extract_key(x, "name") if x is not None else None)
-        # df['lng'] = df['parsed_location'].apply(lambda x: extract_key(x, "lng") if x is not None else None)
-        # df['lat'] = df['parsed_location'].apply(lambda x: extract_key(x, "lat") if x is not None else None)
 
 
 compute_extract_user = False
@@ -177,8 +167,6 @@ if compute_extract_user:
                 )
                 session.add(new_usertagged)
 if compute_extract_locations or compute_extract_hashtags:
-
-
     # Iterate through all_reels and insert data into CleanInstaSavedReel table
     for reel in rawstd_insta_saved_reels:
         # user = reel.user
@@ -216,7 +204,8 @@ if compute_extract_locations or compute_extract_hashtags:
             lat=reel.lat,
             city=reel.city,
             location_name=reel.location_name,
-            user_pk=user_pk
+            user_pk=user_pk,
+            locations_from_caption=reel.locations_from_caption
         )
 
         # Add the record to the session

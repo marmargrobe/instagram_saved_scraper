@@ -2,4 +2,4 @@
 FROM data-cleaner
 
 # Set the command specific to this project
-CMD ["python", "-m", "src.data_cleaner --lookup_col city --top_n 7"]
+CMD ["python", "-m", "src.data_cleaner.data_categorization --lookup_col usertags --top_n 7"]

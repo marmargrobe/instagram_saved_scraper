@@ -2,4 +2,4 @@
 FROM data-cleaner
 
 # Set the command specific to this project
-CMD ["python", "-m", "src.data_cleaner.data_categorization"]
+CMD ["python", "-m", "src.data_cleaner.data_categorization --lookup_col caption_text --top_n 7"]
