@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, JSON, Boolean, ARRAY, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from dotenv import load_dotenv
+import uuid
 import os
 
 # Initialize Base for ORM class declarations
@@ -141,5 +142,29 @@ class CleanInstaSavedReelsCategories(Base):
     processor_version = Column(String(20), nullable=False)
     processor_input = Column(JSON, nullable=False)
     last_updated = Column(DateTime, nullable=True)
+
+class RawstdInstaDownloadSavedReels(Base):
+    __tablename__ = 'insta_download_saved_reels'
+    __table_args__ = {'schema': 'rawstd'}
+
+    id = Column(String, primary_key=True, default=uuid.uuid4)   # Primary key (id)
+    collection_name = Column(String(50))  # Instagram username
+    user_name = Column(String(100))  # Full name
+    reel_url = Column(String)  # URL
+    added_time = Column(DateTime, nullable=True)
+    insta_account = Column(String)
+
+
+class RawstdInstaDownloadSavedCollections(Base):
+    __tablename__ = 'insta_download_saved_collections'
+    __table_args__ = {'schema': 'rawstd'}
+
+    id = Column(String, primary_key=True, default=uuid.uuid4)  # Primary key (id)
+    collection_name = Column(String(50))  # Instagram username
+    creation_time = Column(DateTime, nullable=True)
+    update_time = Column(DateTime, nullable=True)
+    insta_account = Column(String)
+
+
 # Create tables if they don't exist
 Base.metadata.create_all(engine)
