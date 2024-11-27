@@ -131,7 +131,6 @@ class CleanInstaUserTag(Base):
     # tagged_by_insta_user = relationship('CleanInstaUser', backref='usertags')
     # insta_saved_reel = relationship('CleanInstaSavedReel', backref='usertags')
 
-# Define the CleanInstaSavedReelsCategories table
 class CleanInstaSavedReelsCategories(Base):
     __tablename__ = "insta_saved_reels_categories"
     __table_args__ = {'schema': 'clean'}  # Specify the schema name here
@@ -153,6 +152,8 @@ class RawstdInstaDownloadSavedReels(Base):
     reel_url = Column(String)  # URL
     added_time = Column(DateTime, nullable=True)
     insta_account = Column(String)
+    python_script= Column(String)
+    python_runtime = Column(DateTime, nullable=False)
 
 
 class RawstdInstaDownloadSavedCollections(Base):
@@ -164,6 +165,23 @@ class RawstdInstaDownloadSavedCollections(Base):
     creation_time = Column(DateTime, nullable=True)
     update_time = Column(DateTime, nullable=True)
     insta_account = Column(String)
+    python_script= Column(String)
+    python_runtime = Column(DateTime, nullable=False)
+
+class RawstdInstaDownloadSavedReelsDetails(Base):
+    __tablename__ = 'insta_download_saved_reels_details'
+    __table_args__ = {'schema': 'rawstd'}
+
+    id = Column(String, primary_key=True, default=uuid.uuid4)   # Primary key (id)
+    reel_id = Column(String)
+    user_name = Column(String(100))  # Full name
+    reel_url = Column(String)  # URL
+    caption_text = Column(String)
+    location_name = Column(String)
+    insta_account = Column(String)
+    python_script= Column(String)
+    python_runtime = Column(DateTime, nullable=False)
+    hashtags = Column(ARRAY(String))
 
 
 # Create tables if they don't exist
