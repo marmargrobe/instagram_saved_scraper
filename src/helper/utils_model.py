@@ -1,5 +1,14 @@
 from datetime import datetime
 from src.helper.mapping import reels_column_dtype, reels_column_transformations, transform_dtypes
+import logging
+from sqlalchemy.dialects.postgresql import insert
+from src.helper.model import RawstdInstaDownloadSavedReelsDetails
+from sqlalchemy.exc import SQLAlchemyError
+
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 def upsert_insta_saved_reels(all_data, cursor,):
@@ -178,3 +187,49 @@ def upsert_user(all_data, cursor,):
                 else:
                     display_message = "No changed found"
                     print(display_message)
+
+
+
+# Function to insert collection with conflict handling
+
+def insert_record_with_conflict(session, target_table, unique_columns, data):
+    try:
+
+
+        # Create the insert statement using the provided dictionary
+        insert_stmt = insert(target_table).values(data).on_conflict_do_nothing(
+            index_elements=unique_columns  # Replace with your unique constraint columns
+        )
+
+        # Execute the insert statement
+        result = session.execute(insert_stmt)
+
+        # If no rows were inserted (i.e., conflict occurred), log it
+        if result.rowcount == 0:
+            logger.warn(f"Conflict found for collection '{data[unique_columns[0]]}' and account '{data[unique_columns[1]]}'. No new data inserted.")
+
+    except Exception as e:
+        # Log any unexpected errors
+        logger.error(f"Error inserting collection '{data[unique_columns[0]]}': {e}")
+        session.rollback()
+
+
+
+# Function to insert data into RawstdInstaDownloadSavedReelsDetails table
+def insert_reel_detail(data_dict, session):
+    try:
+        # Create an instance of RawstdInstaDownloadSavedReelsDetails using the dictionary
+        reel_detail_entry = RawstdInstaDownloadSavedReelsDetails(**data_dict)
+
+        # Add the entry to the session
+        session.add(reel_detail_entry)
+
+        # Commit the session to insert the data into the database
+        session.commit()
+
+        print("Data inserted successfully into RawstdInstaDownloadSavedReelsDetails table.")
+
+    except SQLAlchemyError as e:
+        # Handle any database errors (e.g., integrity constraints violation, etc.)
+        print(f"Error inserting data: {e}")
+        session.rollback() 
