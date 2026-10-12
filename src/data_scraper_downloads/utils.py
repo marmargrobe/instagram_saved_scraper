@@ -2,6 +2,9 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 import glob
 import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 
 
 # Function to parse datetime
@@ -71,3 +74,38 @@ def get_soup_from_file_path(target_profile, saved_target="your_instagram_activit
     # Read the HTML file
 
     return read_html_file(saved_collections_file_path=saved_collections_file_path)
+
+
+def get_proxies():
+    # Define the path to the proxy file relative to the script's directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    proxy_file_path = os.path.join(script_dir, "proxy/proxies_us.txt")
+    
+    try:
+        # Read proxies from the file, ensuring no blank or invalid lines are included
+        with open(proxy_file_path, "r") as proxy_file:
+            proxies = [line.strip() for line in proxy_file if line.strip() and ":" in line]
+        
+        # Ensure the file contains at least one valid proxy
+        if not proxies:
+            raise ValueError("No valid proxies found in the file.")
+    except FileNotFoundError:
+        print(f"Proxy file not found at {proxy_file_path}.")
+        proxies = []
+    except Exception as e:
+        print(f"Error reading proxy file: {e}")
+        proxies = []
+
+    return proxies 
+
+# Function to get WebDriver with proxy
+def get_driver_with_proxy(proxies):
+    selected_proxy = random.choice(proxies)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--disable-gpu")  # Disable GPU usage
+    chrome_options.add_argument("--no-sandbox")  # For Linux compatibility
+    chrome_options.add_argument(f"--proxy-server=http://{selected_proxy}")  # Configure proxy
+    service = Service()
+    return webdriver.Chrome(service=service, options=chrome_options), selected_proxy
+

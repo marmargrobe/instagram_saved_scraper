@@ -4,7 +4,6 @@ from transformers import pipeline
 from datetime import datetime
 import numpy as np
 from src.helper.model import CleanInstaSavedReelsCategories, CleanInstaSavedReel, RawstdInstaSavedCollection
-import pandas as pd
 
 from sqlalchemy.orm import Session
 from datetime import datetime
