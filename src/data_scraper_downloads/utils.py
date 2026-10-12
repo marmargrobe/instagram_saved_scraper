@@ -57,19 +57,18 @@ def get_soup_from_file_path(target_profile, saved_target="your_instagram_activit
 
     file_path = os.path.join(script_dir, 'downloaded')
     print(file_path)
-    list_profiles = [x.replace(file_path, "") for x in glob.glob(f"{file_path}/*")]
-    
-    # Find the target profile
-    num = 0
-    for p in list_profiles:
-        if target_profile in p:
-            break
-        else:
-            num += 1
-    target_profile_file = list_profiles[num]
-    
+
+    # Export folders are named instagram-<profile>-<YYYY-MM-DD>-<id>, so sorting by name
+    # puts the newest export for the profile last
+    profile_dirs = sorted(glob.glob(f"{file_path}/instagram-{target_profile}-*"))
+    if not profile_dirs:
+        print(f"Error: no export folder found for '{target_profile}' in '{file_path}'.")
+        return None
+    target_profile_file = profile_dirs[-1]
+    print(f"Using export: {os.path.basename(target_profile_file)}")
+
     # Set the path for the saved collections file
-    saved_collections_file_path = f"{file_path}/{target_profile_file}/{saved_target}"
+    saved_collections_file_path = f"{target_profile_file}/{saved_target}"
 
     # Read the HTML file
 
