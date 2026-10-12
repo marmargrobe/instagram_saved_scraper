@@ -16,3 +16,11 @@ __pycache__/
 # Ignore IDE-specific files
 .vscode/
 .idea/
+
+.env.aws.bak
+
+# Personal data and local-only files
+src/data_scraper_downloads/downloaded/
+src/data_scraper_downloads/proxy/
+deleted/
+.DS_Store
