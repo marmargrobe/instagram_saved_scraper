@@ -8,6 +8,7 @@ and organizes them, and shows them in a local Streamlit app.
   - [Setup](#setup)
   - [Importing a new Instagram export](#importing-a-new-instagram-export)
   - [Cleaning the data](#cleaning-the-data)
+  - [Thumbnails](#thumbnails)
   - [The app](#the-app)
   - [Docker (old AWS setup)](#docker-old-aws-setup)
   - [Credits](#credits)
@@ -75,6 +76,16 @@ newer one (adds captions, hashtags and the post owner).
 python -m src.data_cleaner.reels_scraped_transform      # rawstd.insta_saved_reels → clean tables
 python -m src.data_cleaner.reels_scraped_categorize --lookup_col caption_text --top_n 3
 ```
+
+### Thumbnails
+
+Instagram's image links expire, so the app shows pictures saved on this laptop:
+```
+python -m src.data_scraper_downloads.fetch_thumbnails --tab recipes   # or travel, all, ...
+```
+It opens each post's public embed page (no login) in headless Chrome and saves the cover image
+to `media/thumbnails/<code>.jpg` (gitignored). Posts removed from Instagram get a `.removed`
+marker. Already-fetched posts are skipped, so run it again after each import.
 
 ### The app
 

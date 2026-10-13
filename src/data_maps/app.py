@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import folium
 import pandas as pd
+from PIL import Image
 import streamlit as st
 from folium.plugins import MarkerCluster
 from sqlalchemy import text
@@ -20,6 +21,7 @@ from streamlit_folium import st_folium
 
 from src.helper.model import engine
 
+THUMBNAIL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "media", "thumbnails")
 POST_CODE = r"instagram\.com/(?:reel|p|tv)/([^/?#]+)"
 
 st.set_page_config(page_title="Saved Instagram", page_icon="📍", layout="wide")
@@ -89,8 +91,33 @@ def load_recipes():
     return recipes
 
 
+@st.cache_data
+def thumbnail(code, ratio=4 / 5):
+    """Cached cover image cropped to width/height = ratio, or None."""
+    path = os.path.join(THUMBNAIL_DIR, f"{code}.jpg")
+    if not os.path.exists(path):
+        return None
+    image = Image.open(path)
+    width, height = image.size
+    if width / height < ratio:  # too tall: keep the middle
+        new_height = int(width / ratio)
+        top = (height - new_height) // 2
+        image = image.crop((0, top, width, top + new_height))
+    image.thumbnail((600, 750))
+    return image
+
+
+def removed_from_instagram(code):
+    return os.path.exists(os.path.join(THUMBNAIL_DIR, f"{code}.removed"))
+
+
 def show_recipe(recipe):
     with st.container(border=True):
+        picture = thumbnail(recipe.code)
+        if picture is not None:
+            st.image(picture, width="stretch")
+        elif removed_from_instagram(recipe.code):
+            st.caption("🚫 Removed from Instagram")
         st.markdown(f"**{recipe.recipe_name or 'Untitled'}**")
         badges = [RECIPE_STATUS[recipe.status], recipe.meal_type, recipe.cuisine, *recipe.diet_tags]
         st.caption(" · ".join(b for b in badges if b) + (f"  \n@{recipe.owner_username}" if recipe.owner_username else ""))
