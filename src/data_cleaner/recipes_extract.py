@@ -244,15 +244,15 @@ def add_labels(classifier, rows, captions):
             row["cuisine"] = CUISINES[cuisine["labels"][0]]
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--no-labels", action="store_true", help="skip zero-shot meal type / cuisine labels")
-    args = parser.parse_args()
-
+def run(labels=True, new_only=False):
+    """Extract recipes; returns a one-line summary. new_only: only posts not yet in clean.recipes."""
+    query = "SELECT code, caption, hashtags FROM clean.saved_posts WHERE 'recipes' = ANY (tabs)"
+    if new_only:
+        query += " AND code NOT IN (SELECT code FROM clean.recipes)"
     with engine.connect() as connection:
-        posts = connection.execute(
-            text("SELECT code, caption, hashtags FROM clean.saved_posts WHERE 'recipes' = ANY (tabs)")
-        ).all()
+        posts = connection.execute(text(query)).all()
+    if not posts:
+        return "no new recipe posts"
 
     now = datetime.now()
     rows, captions = [], []
@@ -272,7 +272,7 @@ def main():
         rows.append(row)
         captions.append(caption or "")
 
-    if not args.no_labels:
+    if labels:
         print(f"Labeling {len(rows)} posts with the zero-shot model (takes a few minutes on CPU)...")
         add_labels(load_classifier(), rows, captions)
 
@@ -284,9 +284,15 @@ def main():
     with engine.begin() as connection:
         connection.execute(statement)
 
-    print(f"{len(rows)} recipe posts processed:")
-    for status, count in Counter(r["status"] for r in rows).most_common():
-        print(f"  {status}: {count}")
+    return f"{len(rows)} recipe posts: " + ", ".join(f"{s} {n}" for s, n in Counter(r["status"] for r in rows).most_common())
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--no-labels", action="store_true", help="skip zero-shot meal type / cuisine labels")
+    parser.add_argument("--new-only", action="store_true", help="only posts not processed yet")
+    args = parser.parse_args()
+    print(run(labels=not args.no_labels, new_only=args.new_only))
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ rating are kept. The table is replaced in one transaction.
 """
 import argparse
 import csv
+import time
 import gzip
 import io
 import os
@@ -61,13 +62,39 @@ def copy_value(value):
     return str(value).replace("\\", "\\\\").replace("\t", " ").replace("\n", " ").replace("\r", " ")
 
 
+def files_age_days():
+    """Age of the oldest downloaded IMDb file in days, or None if a file is missing."""
+    paths = [os.path.join(IMDB_DIR, f) for f in FILES]
+    if not all(os.path.exists(p) for p in paths):
+        return None
+    return (time.time() - min(os.path.getmtime(p) for p in paths)) / 86400
+
+
+def run(max_age_days=30, force=False):
+    """Download and load IMDb data when it is older than max_age_days; returns a one-line summary."""
+    age = files_age_days()
+    if not force and age is not None and age < max_age_days:
+        with engine.connect() as connection:
+            loaded = connection.exec_driver_sql("SELECT count(*) FROM reference.imdb_titles").scalar()
+        if loaded:
+            return f"IMDb data is {age:.0f} days old (refreshes after {max_age_days}), skipped"
+    if force or age is None or age >= max_age_days:
+        download()
+    return f"{load():,} movies and series loaded"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--download", action="store_true", help="download fresh files even if they exist")
     args = parser.parse_args()
 
-    if args.download or not all(os.path.exists(os.path.join(IMDB_DIR, f)) for f in FILES):
+    if args.download or files_age_days() is None:
         download()
+    print(f"Done: {load():,} movies and series in reference.imdb_titles")
+
+
+def load():
+    """Load the downloaded files into reference.imdb_titles; returns the number of titles."""
 
     print("Reading ratings...")
     ratings = {r["tconst"]: (r["averageRating"], r["numVotes"]) for r in read_tsv("title.ratings.tsv.gz")}
@@ -101,7 +128,7 @@ def main():
         raise
     finally:
         connection.close()
-    print(f"Done: {kept:,} movies and series in reference.imdb_titles")
+    return kept
 
 
 if __name__ == "__main__":

@@ -135,7 +135,8 @@ def match_book(title):
     }
 
 
-def main():
+def run():
+    """Run the extraction; returns a one-line summary."""
     nlp = spacy.load("en_core_web_sm")
     now = datetime.now()
     rows = []
@@ -182,9 +183,12 @@ def main():
 
     with_title = {r["code"] for r in rows}
     no_caption = sum(1 for p in posts if not p.caption)
-    print(f"{len(posts)} watch/read posts: {len(with_title)} with a title, "
-          f"{len(posts) - len(with_title) - no_caption} with a caption but no title, {no_caption} without a caption")
-    print("Found by: " + ", ".join(f"{k} {v}" for k, v in Counter(r["found_by"] for r in rows).most_common()))
+    return (f"{len(posts)} watch/read posts: {len(with_title)} with a title, "
+            f"{len(posts) - len(with_title) - no_caption} with a caption but no title, {no_caption} without a caption")
+
+
+def main():
+    print(run())
 
 
 if __name__ == "__main__":

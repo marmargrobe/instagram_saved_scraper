@@ -120,17 +120,34 @@ def import_profile(profile, verbose):
             for (module, _), soup in zip(LOADERS, soups):
                 if soup:
                     module.process_collections_and_reels(soup=soup, target_profile=profile)
-    for (_, target), soup in zip(LOADERS, soups):
-        if soup is None:
-            print(f"  {os.path.basename(target)} not in this export, skipped")
     after = saved_counts(profile)
-
-    print(f"  saved posts: {before[0]} -> {after[0]} (+{after[0] - before[0]})")
-    print(f"  collections: {before[1]} -> {after[1]} (+{after[1] - before[1]})")
-    print(f"  newest save: {before[2]} -> {after[2]}")
-    print(f"  captions:    {before[3]} -> {after[3]} (+{after[3] - before[3]})")
+    lines = [f"  {os.path.basename(target)} not in this export, skipped"
+             for (_, target), soup in zip(LOADERS, soups) if soup is None]
+    lines += [
+        f"  saved posts: {before[0]} -> {after[0]} (+{after[0] - before[0]})",
+        f"  collections: {before[1]} -> {after[1]} (+{after[1] - before[1]})",
+        f"  newest save: {before[2]} -> {after[2]}",
+        f"  captions:    {before[3]} -> {after[3]} (+{after[3] - before[3]})",
+    ]
     if after[0] == before[0] and after[2] == before[2]:
-        print("  nothing new; if you expected new saves, Instagram may have changed the export's HTML layout")
+        lines.append("  nothing new; if you expected new saves, Instagram may have changed the export's HTML layout")
+    summary = (f"{profile}: +{after[0] - before[0]} saves, +{after[1] - before[1]} collections, "
+               f"+{after[3] - before[3]} captions")
+    return lines, summary
+
+
+def run(source="~/Downloads"):
+    """Copy and import new exports found in source; returns a one-line summary."""
+    logging.getLogger("src.helper.utils_model").setLevel(logging.ERROR)
+    exports = find_exports(os.path.expanduser(source))
+    new_exports = {n: p for n, p in exports.items() if not os.path.exists(os.path.join(DOWNLOADED_DIR, n))}
+    if not new_exports:
+        return f"no new Instagram exports in {source}"
+    profiles = set()
+    for name, path in sorted(new_exports.items()):
+        copy_export(name, path)
+        profiles.add(EXPORT_NAME.match(name)["profile"])
+    return "; ".join(import_profile(profile, verbose=False)[1] for profile in sorted(profiles))
 
 
 def main():
@@ -147,7 +164,7 @@ def main():
 
     if args.profile:
         print(f"Importing {args.profile}")
-        import_profile(args.profile, args.verbose)
+        print("\n".join(import_profile(args.profile, args.verbose)[0]))
         return
 
     exports = find_exports(os.path.expanduser(args.source))
@@ -172,7 +189,7 @@ def main():
         return
     for profile in sorted(profiles):
         print(f"Importing {profile}")
-        import_profile(profile, args.verbose)
+        print("\n".join(import_profile(profile, args.verbose)[0]))
 
 
 if __name__ == "__main__":
