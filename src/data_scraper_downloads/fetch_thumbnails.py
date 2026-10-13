@@ -10,8 +10,9 @@ embed posts; no login) in headless Chrome, reads the cover image and saves it as
 media/thumbnails/<code>.jpg. Posts that already have a thumbnail are skipped, so it can be
 re-run after each import. Instagram's image links expire, which is why the file is saved.
 
-Posts Instagram reports as removed get an empty media/thumbnails/<code>.removed marker so
-they are not retried (use --retry-removed to try them again) and the app can say so.
+Posts whose embed page says "may have been removed" get an empty media/thumbnails/<code>.removed
+marker so they are not retried (use --retry-removed to try them again). Instagram shows that
+page both for deleted posts and for posts whose owner turned off embedding.
 """
 import argparse
 import os
