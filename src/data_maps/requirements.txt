@@ -1,0 +1,7 @@
+streamlit
+folium
+streamlit-folium
+pandas
+sqlalchemy>=2.0,<2.1  # 2.1 defaults postgresql:// to psycopg 3; the shared model uses psycopg2
+psycopg2-binary
+python-dotenv

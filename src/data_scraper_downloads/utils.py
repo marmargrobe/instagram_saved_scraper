@@ -2,6 +2,9 @@ from datetime import datetime
 from bs4 import BeautifulSoup
 import glob
 import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 
 
 # Function to parse datetime
@@ -54,20 +57,54 @@ def get_soup_from_file_path(target_profile, saved_target="your_instagram_activit
 
     file_path = os.path.join(script_dir, 'downloaded')
     print(file_path)
-    list_profiles = [x.replace(file_path, "") for x in glob.glob(f"{file_path}/*")]
-    
-    # Find the target profile
-    num = 0
-    for p in list_profiles:
-        if target_profile in p:
-            break
-        else:
-            num += 1
-    target_profile_file = list_profiles[num]
-    
+
+    # Export folders are named instagram-<profile>-<YYYY-MM-DD>-<id>, so sorting by name
+    # puts the newest export for the profile last
+    profile_dirs = sorted(glob.glob(f"{file_path}/instagram-{target_profile}-*"))
+    if not profile_dirs:
+        print(f"Error: no export folder found for '{target_profile}' in '{file_path}'.")
+        return None
+    target_profile_file = profile_dirs[-1]
+    print(f"Using export: {os.path.basename(target_profile_file)}")
+
     # Set the path for the saved collections file
-    saved_collections_file_path = f"{file_path}/{target_profile_file}/{saved_target}"
+    saved_collections_file_path = f"{target_profile_file}/{saved_target}"
 
     # Read the HTML file
 
     return read_html_file(saved_collections_file_path=saved_collections_file_path)
+
+
+def get_proxies():
+    # Define the path to the proxy file relative to the script's directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    proxy_file_path = os.path.join(script_dir, "proxy/proxies_us.txt")
+    
+    try:
+        # Read proxies from the file, ensuring no blank or invalid lines are included
+        with open(proxy_file_path, "r") as proxy_file:
+            proxies = [line.strip() for line in proxy_file if line.strip() and ":" in line]
+        
+        # Ensure the file contains at least one valid proxy
+        if not proxies:
+            raise ValueError("No valid proxies found in the file.")
+    except FileNotFoundError:
+        print(f"Proxy file not found at {proxy_file_path}.")
+        proxies = []
+    except Exception as e:
+        print(f"Error reading proxy file: {e}")
+        proxies = []
+
+    return proxies 
+
+# Function to get WebDriver with proxy
+def get_driver_with_proxy(proxies):
+    selected_proxy = random.choice(proxies)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in headless mode
+    chrome_options.add_argument("--disable-gpu")  # Disable GPU usage
+    chrome_options.add_argument("--no-sandbox")  # For Linux compatibility
+    chrome_options.add_argument(f"--proxy-server=http://{selected_proxy}")  # Configure proxy
+    service = Service()
+    return webdriver.Chrome(service=service, options=chrome_options), selected_proxy
+
