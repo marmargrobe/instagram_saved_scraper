@@ -267,11 +267,12 @@ class Geocoder:
         for query, codes in attempts:
             raw = self.lookup(query, codes)
             if raw and plausible_match(query, raw, exact):
-                return raw
-        return None
+                return raw, query
+        return None, None
 
 
-def to_row(code, name, source, rank, raw, caption):
+def to_row(code, name, source, rank, match, caption):
+    raw, matched_query = match
     row = {
         "code": code, "name": name, "source": source, "rank": rank,
         "lat": None, "lng": None, "matched_name": None, "city": None, "region": None,
@@ -287,12 +288,19 @@ def to_row(code, name, source, rank, raw, caption):
             "osm_class": raw.get("class"), "osm_type": raw.get("type"),
         })
         row["place_type"] = place_type(row["osm_class"], row["osm_type"])
+    name_words = distinctive_words(expand_abbreviations(name))
+    broad_fallback = (
+        raw is not None and row["place_type"] in BROAD_TYPES and name_words
+        and name_words[0] not in distinctive_words(matched_query or "")
+    )
+    if broad_fallback:
+        return row  # only the broad part matched ("Stoos Ridge, Switzerland" -> Switzerland): stays a region
     for pattern, label in NAME_TYPES:
         if re.search(pattern, name, re.IGNORECASE):
             row["place_type"] = label
             break
-    if row["place_type"] in BROAD_TYPES and source != "caption":
-        row["place_type"] = keyword_type(caption) or row["place_type"]
+    if row["place_type"] is None and source == "geotag":
+        row["place_type"] = keyword_type(caption)
     return row
 
 
@@ -336,8 +344,10 @@ def main():
             for name in pins:
                 rows.append(to_row(post.code, name, "pin", 1, geocoder.best_match(name, countries), caption))
             if post.geotag_lat is not None:
-                row = to_row(post.code, post.geotag_name or "Post location", "geotag", 2, None, caption)
-                row.update({"lat": post.geotag_lat, "lng": post.geotag_lng})
+                name = post.geotag_name or "Post location"
+                match = geocoder.best_match(name, countries) if post.geotag_name else (None, None)
+                row = to_row(post.code, name, "geotag", 2, match, caption)
+                row.update({"lat": post.geotag_lat, "lng": post.geotag_lng})  # the post's own coordinates win
                 rows.append(row)
             for name, rank in caption_places(nlp, caption, pins + [post.geotag_name or ""]):
                 rows.append(to_row(post.code, name, "caption", rank, geocoder.best_match(name, countries, exact=True), caption))
