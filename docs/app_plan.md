@@ -87,8 +87,8 @@ Split captions into prompts (questions, numbered lines). Label prompts by theme
 A short "what is this" plus tags. To be refined later; the content is varied.
 
 ## Build order
-1. `clean.saved_posts` (foundation) and `clean.collection_tabs`
-2. Recipes tab
+1. ✅ `clean.saved_posts` (foundation) and `clean.collection_tabs`
+2. ✅ Recipes tab (v1): `python -m src.data_cleaner.recipes_extract` fills `clean.recipes`
 3. Travel tab
 4. Watch / read tab
 5. Remaining tabs
@@ -97,7 +97,10 @@ A short "what is this" plus tags. To be refined later; the content is varied.
 Everything mentioned so far, to come back to:
 
 - **Workouts:** clickable human body/muscle map; pick a muscle group, see exercises for it.
-- **Recipes:** categories/labels; calorie estimate per recipe (ingredient parsing + USDA FoodData Central).
+- **Recipes:** calorie estimate per recipe (ingredient parsing + USDA FoodData Central); edit a recipe in the
+  app (fix name/labels/status; sets `user_edited` so re-extraction keeps the edit); split "what I eat in a day"
+  posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
+  which currently takes ~10 min for 32 posts).
 - **Journal prompts:** custom prompt categories; label prompts by hand in the app.
 - **Watch / read:** "today I want to watch/read" picker by genre.
 - **Travel:** place type (café, restaurant, hike, monument, …); zoom-linked "places in view" frequency chart; trip lists (Mars & Ags is a shared trip list with a friend).
