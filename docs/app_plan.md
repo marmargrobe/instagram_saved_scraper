@@ -134,10 +134,11 @@ Everything mentioned so far, to come back to:
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
   which currently takes ~10 min for 32 posts).
 - **Journal prompts:** ✅ custom categories and labeling in the app (v1). Next:
-  - **Replies:** a "✍️ Write" box under each prompt; each reply is saved with its date in
-    `personal.journal_entries` (own schema, separate from the Instagram data, never part of any hosted version).
-    The prompt stays; it shows a tally ("2 replies") that expands to the earlier replies, newest first.
-    Maybe: "on this day" view, and a page that reads all entries like a diary.
+  - ✅ **Replies (v1):** "✍️ Write" under each prompt saves a dated entry in `personal.journal_entries`
+    (own schema, separate from the Instagram data, never part of any hosted version); the prompt stays and
+    shows "📖 2 replies" with the earlier replies (editable); "📖 My journal" reads every entry like a diary.
+    Next: "on this day" view; regular backup of the `personal` schema
+    (`pg_dump -d mars -n personal -f journal_backup.sql`).
   - Export favorites as a printable list.
 - **UI design session (together):** colors, fonts, spacing and layout for each tab — Streamlit theme
   (`.streamlit/config.toml`), custom CSS, maybe a color and icon per tab.

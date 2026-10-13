@@ -414,17 +414,66 @@ def save_prompt_choice(prompt, **changes):
     load_prompts.clear()
 
 
-def show_prompt(prompt, categories):
+@st.cache_data(ttl=600)
+def load_entries():
+    """My journal entries (personal.journal_entries), newest first."""
+    entries = pd.read_sql(
+        text("""
+            SELECT id, prompt_key, prompt_text, body, written_at, updated_at
+            FROM personal.journal_entries
+            ORDER BY written_at DESC
+        """),
+        engine,
+    )
+    return entries.astype(object).where(entries.notna(), None)
+
+
+def save_entry(prompt, body):
+    """Add a reply to a prompt and mark the prompt as used."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO personal.journal_entries (prompt_key, prompt_text, body) VALUES (:key, :prompt, :body)"),
+            {"key": prompt.prompt_key, "prompt": prompt.prompt, "body": body.strip()},
+        )
+    if not prompt.used:
+        save_prompt_choice(prompt, used=True)
+    load_entries.clear()
+
+
+def update_entry(entry_id, body):
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE personal.journal_entries SET body = :body, updated_at = now() WHERE id = :id"),
+            {"body": body.strip(), "id": entry_id},
+        )
+    load_entries.clear()
+
+
+def show_entry(entry, with_prompt=False):
+    edited = f" · edited {entry.updated_at:%b %d}" if entry.updated_at else ""
+    st.caption(f"{entry.written_at:%a, %b %d, %Y · %I:%M %p}{edited}")
+    if with_prompt:
+        st.markdown(f"*{entry.prompt_text}*")
+    st.markdown(entry.body.replace("\n", "  \n"))
+    with st.popover("Edit", type="tertiary"):
+        with st.form(f"edit_entry_{entry.id}", border=False):
+            body = st.text_area("Your reply", value=entry.body, height=200, label_visibility="collapsed")
+            if st.form_submit_button("Save changes") and body.strip():
+                update_entry(entry.id, body)
+                st.rerun()
+
+
+def show_prompt(prompt, categories, replies):
     with st.container(border=True):
         text_col, actions = st.columns([5, 3])
         heading = f"**{prompt.heading}** · " if prompt.heading else ""
-        text_col.markdown(heading + prompt.prompt + (" ⭐" if prompt.favorite else "") + (" ✍️" if prompt.used else ""))
+        text_col.markdown(heading + prompt.prompt + (" ⭐" if prompt.favorite else "") + (" ☑️" if prompt.used else ""))
         text_col.caption(f"[@{prompt.owner_username or 'post'}]({prompt.url})")
         buttons = actions.columns(3)
         if buttons[0].button("⭐", key=f"fav_{prompt.prompt_key}", help="Favorite"):
             save_prompt_choice(prompt, favorite=not prompt.favorite)
             st.rerun()
-        if buttons[1].button("✍️", key=f"used_{prompt.prompt_key}", help="Mark as used (journaled about it)"):
+        if buttons[1].button("☑️", key=f"used_{prompt.prompt_key}", help="Mark as used / not used"):
             save_prompt_choice(prompt, used=not prompt.used)
             st.rerun()
         if buttons[2].button("🙈", key=f"hide_{prompt.prompt_key}", help="Hide"):
@@ -438,6 +487,20 @@ def show_prompt(prompt, categories):
         if new_category and new_category != prompt.category:
             save_prompt_choice(prompt, category=new_category)
             st.rerun()
+
+        write, history = st.columns(2)
+        with write.expander("✍️ Write"):
+            with st.form(f"write_{prompt.prompt_key}", border=False, clear_on_submit=True):
+                body = st.text_area("Your reply", height=180, label_visibility="collapsed",
+                                    placeholder="Write your reply…")
+                if st.form_submit_button("Save") and body.strip():
+                    save_entry(prompt, body)
+                    st.toast("Saved to your journal ✍️")
+                    st.rerun()
+        if len(replies):
+            with history.expander(f"📖 {len(replies)} {'reply' if len(replies) == 1 else 'replies'}"):
+                for entry in replies.itertuples():
+                    show_entry(entry)
 
 
 def latest_run():
@@ -744,47 +807,65 @@ with workouts_tab:
 
 with journal_tab:
     prompts = load_prompts()
-    visible = prompts[~prompts["hidden"]]
-    categories = sorted(visible["category"].dropna().unique())
-
-    st.subheader("✨ A prompt for today")
-    today = st.columns([2, 1])
-    today_category = today[0].selectbox("From", ["Any category"] + categories, label_visibility="collapsed")
-    pool = visible[~visible["used"]]
-    if today_category != "Any category":
-        pool = pool[pool["category"] == today_category]
-    if today[1].button("🔀 Another one", disabled=pool.empty) or st.session_state.get("prompt_of_day") not in set(pool["prompt_key"]):
-        st.session_state["prompt_of_day"] = random.choice(list(pool["prompt_key"])) if not pool.empty else None
-    todays = pool[pool["prompt_key"] == st.session_state.get("prompt_of_day")]
-    if todays.empty:
-        st.caption("No unused prompts here.")
-    else:
-        st.info(next(todays.itertuples()).prompt)
-
-    st.divider()
-    picked_categories = st.pills(
-        "Categories", categories, selection_mode="multi",
-        format_func=lambda c: f"{c} ({(visible['category'] == c).sum()})",
+    entries = load_entries()
+    view = st.segmented_control(
+        "View", ["Prompts", "My journal"], default="Prompts", label_visibility="collapsed",
+        format_func=lambda v: {"Prompts": "💭 Prompts", "My journal": "📖 My journal"}[v],
     )
-    filters = st.columns([1, 2, 1])
-    prompt_kind = filters[0].radio("Kind", ["All", "Questions", "ChatGPT"], horizontal=True, label_visibility="collapsed")
-    prompt_query = filters[1].text_input("Search prompts", placeholder="word in a prompt", label_visibility="collapsed")
-    favorites_only = filters[2].toggle("Favorites only")
+    if view == "My journal":
+        st.caption(f"{len(entries)} {'entry' if len(entries) == 1 else 'entries'}")
+        journal_query = st.text_input("Search my journal", placeholder="word in a reply or prompt")
+        shown_entries = entries
+        if journal_query:
+            q = journal_query.lower()
+            shown_entries = entries[entries.apply(lambda e: q in (e["body"] + " " + e["prompt_text"]).lower(), axis=1)]
+        if shown_entries.empty:
+            st.caption("No entries yet — open ✍️ Write under any prompt." if entries.empty else "No entries match.")
+        for entry in shown_entries.itertuples():
+            with st.container(border=True):
+                show_entry(entry, with_prompt=True)
+    else:
+        visible = prompts[~prompts["hidden"]]
+        categories = sorted(visible["category"].dropna().unique())
 
-    shown = visible
-    if picked_categories:
-        shown = shown[shown["category"].isin(picked_categories)]
-    if prompt_kind != "All":
-        shown = shown[shown["kind"] == {"Questions": "question", "ChatGPT": "chatgpt"}[prompt_kind]]
-    if prompt_query:
-        shown = shown[shown["prompt"].str.contains(prompt_query, case=False, regex=False)]
-    if favorites_only:
-        shown = shown[shown["favorite"]]
+        st.subheader("✨ A prompt for today")
+        today = st.columns([2, 1])
+        today_category = today[0].selectbox("From", ["Any category"] + categories, label_visibility="collapsed")
+        pool = visible[~visible["used"]]
+        if today_category != "Any category":
+            pool = pool[pool["category"] == today_category]
+        if today[1].button("🔀 Another one", disabled=pool.empty) or st.session_state.get("prompt_of_day") not in set(pool["prompt_key"]):
+            st.session_state["prompt_of_day"] = random.choice(list(pool["prompt_key"])) if not pool.empty else None
+        todays = pool[pool["prompt_key"] == st.session_state.get("prompt_of_day")]
+        if todays.empty:
+            st.caption("No unused prompts here.")
+        else:
+            st.info(next(todays.itertuples()).prompt)
 
-    st.write(f"{len(shown)} of {len(visible)} prompts · {int(visible['used'].sum())} used · "
-             f"{int(prompts['hidden'].sum())} hidden")
-    for prompt in shown.itertuples():
-        show_prompt(prompt, categories)
+        st.divider()
+        picked_categories = st.pills(
+            "Categories", categories, selection_mode="multi",
+            format_func=lambda c: f"{c} ({(visible['category'] == c).sum()})",
+        )
+        filters = st.columns([1, 2, 1])
+        prompt_kind = filters[0].radio("Kind", ["All", "Questions", "ChatGPT"], horizontal=True, label_visibility="collapsed")
+        prompt_query = filters[1].text_input("Search prompts", placeholder="word in a prompt", label_visibility="collapsed")
+        favorites_only = filters[2].toggle("Favorites only")
+
+        shown = visible
+        if picked_categories:
+            shown = shown[shown["category"].isin(picked_categories)]
+        if prompt_kind != "All":
+            shown = shown[shown["kind"] == {"Questions": "question", "ChatGPT": "chatgpt"}[prompt_kind]]
+        if prompt_query:
+            shown = shown[shown["prompt"].str.contains(prompt_query, case=False, regex=False)]
+        if favorites_only:
+            shown = shown[shown["favorite"]]
+
+        st.write(f"{len(shown)} of {len(visible)} prompts · {int(visible['used'].sum())} used · "
+                 f"{int(prompts['hidden'].sum())} hidden")
+        for prompt in shown.itertuples():
+            show_prompt(prompt, categories, entries[entries["prompt_key"] == prompt.prompt_key])
 
 with browse_tab:
     st.write(f"{len(filtered):,} posts")
