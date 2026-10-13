@@ -183,6 +183,26 @@ class RawstdInstaDownloadSavedReelsDetails(Base):
     python_runtime = Column(DateTime, nullable=False)
     hashtags = Column(ARRAY(String))
 
+class CleanRecipe(Base):
+    __tablename__ = 'recipes'
+    __table_args__ = {'schema': 'clean'}
+
+    code = Column(String(50), primary_key=True)  # Instagram shortcode (clean.saved_posts.code)
+    recipe_name = Column(String)
+    servings = Column(String)
+    ingredients = Column(ARRAY(String), nullable=False, default=list)
+    steps = Column(ARRAY(String), nullable=False, default=list)
+    status = Column(String(20), nullable=False)
+    recipe_link = Column(String)
+    how_to_get = Column(String)
+    meal_type = Column(String(30))
+    cuisine = Column(String(30))
+    diet_tags = Column(ARRAY(String), nullable=False, default=list)
+    notes = Column(String)
+    user_edited = Column(Boolean, nullable=False, default=False)  # re-extraction skips edited rows
+    extractor_version = Column(String(10))
+    extracted_at = Column(DateTime)
+
 
 # Create tables if they don't exist
 Base.metadata.create_all(engine)
