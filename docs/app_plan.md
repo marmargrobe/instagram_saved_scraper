@@ -96,7 +96,8 @@ A short "what is this" plus tags. To be refined later; the content is varied.
 4. ✅ Watch / read tab (v1): `python -m src.data_cleaner.imdb_load` loads IMDb movies/series into
    `reference.imdb_titles`; `python -m src.data_cleaner.watch_read_extract` fills `clean.watch_read_titles`;
    watched / not interested saved in `clean.watch_read_choices`
-5. Refresh pipeline (see below)
+5. ✅ Refresh pipeline (see below): `python -m src.pipeline.refresh`, `ops.pipeline_runs`, sidebar
+   "Update now" + "Request a new Instagram export", optional weekly launchd job
 6. ✅ Workouts tab (v1): `python -m src.data_cleaner.workouts_extract` fills `clean.workouts` (keyword rules:
    body areas, type, exercises with sets, equipment); body-area buttons in the app
 7. ✅ Journal prompts tab (v1): `python -m src.data_cleaner.journal_prompts_extract` fills
@@ -104,7 +105,7 @@ A short "what is this" plus tags. To be refined later; the content is varied.
    `clean.journal_prompt_choices`, keyed by prompt text so they survive re-extraction
 8. Remaining tabs: Hobbies & projects, Business
 
-## Refresh pipeline (planned)
+## Refresh pipeline
 Everything goes stale at different speeds, so one runner keeps it current:
 
 | Step | Depends on | Runs when |
@@ -132,8 +133,14 @@ Everything mentioned so far, to come back to:
   app (fix name/labels/status; sets `user_edited` so re-extraction keeps the edit); split "what I eat in a day"
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
   which currently takes ~10 min for 32 posts).
-- **Journal prompts:** ✅ custom categories and labeling in the app (v1). Next: a writing box to answer a prompt
-  and keep the entry; export favorites as a printable list.
+- **Journal prompts:** ✅ custom categories and labeling in the app (v1). Next:
+  - **Replies:** a "✍️ Write" box under each prompt; each reply is saved with its date in
+    `personal.journal_entries` (own schema, separate from the Instagram data, never part of any hosted version).
+    The prompt stays; it shows a tally ("2 replies") that expands to the earlier replies, newest first.
+    Maybe: "on this day" view, and a page that reads all entries like a diary.
+  - Export favorites as a printable list.
+- **UI design session (together):** colors, fonts, spacing and layout for each tab — Streamlit theme
+  (`.streamlit/config.toml`), custom CSS, maybe a color and icon per tab.
 - **Watch / read recommendations:** "more like the films I saved". Free and local: add IMDb's
   `title.principals` + `name.basics` (directors, actors, composers), build a profile per film (genres, decade,
   director, cast, composer) and rank well-rated films by cosine similarity (scikit-learn), with reasons
