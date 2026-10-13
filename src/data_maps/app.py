@@ -118,7 +118,7 @@ def show_recipe(recipe):
         if picture is not None:
             st.image(picture, width="stretch")
         elif removed_from_instagram(recipe.code):
-            st.caption("🚫 Removed from Instagram")
+            st.caption("🚫 No picture: removed from Instagram, or embedding turned off")
         st.markdown(f"**{recipe.recipe_name or 'Untitled'}**")
         badges = [RECIPE_STATUS[recipe.status], recipe.meal_type, recipe.cuisine, *recipe.diet_tags]
         st.caption(" · ".join(b for b in badges if b) + (f"  \n@{recipe.owner_username}" if recipe.owner_username else ""))
@@ -227,7 +227,7 @@ def show_place(place, options):
         if picture is not None:
             st.image(picture, width="stretch")
         elif removed_from_instagram(place.code):
-            st.caption("🚫 Removed from Instagram")
+            st.caption("🚫 No picture: removed from Instagram, or embedding turned off")
         st.markdown(f"**{place.label}**")
         st.caption(" · ".join(x for x in (place.place_type, place.area) if x)
                    + (f"  \n@{place.owner_username}" if place.owner_username else ""))
