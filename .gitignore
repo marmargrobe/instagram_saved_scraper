@@ -31,3 +31,6 @@ media/
 
 # Downloaded reference data (IMDb datasets)
 data/
+
+# Refresh logs
+logs/
