@@ -20,7 +20,7 @@ from streamlit_folium import st_folium
 
 from src.helper.model import engine
 
-POST_CODE = r"instagram\.com/(?:reel|p)/([^/?#]+)"
+POST_CODE = r"instagram\.com/(?:reel|p|tv)/([^/?#]+)"
 
 st.set_page_config(page_title="Saved Instagram", page_icon="📍", layout="wide")
 
