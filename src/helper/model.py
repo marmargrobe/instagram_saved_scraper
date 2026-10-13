@@ -203,6 +203,22 @@ class CleanRecipe(Base):
     extractor_version = Column(String(10))
     extracted_at = Column(DateTime)
 
+class CleanWorkout(Base):
+    __tablename__ = 'workouts'
+    __table_args__ = {'schema': 'clean'}
+
+    code = Column(String(50), primary_key=True)  # Instagram shortcode (clean.saved_posts.code)
+    title = Column(String)
+    workout_type = Column(String(20))
+    body_areas = Column(ARRAY(String), nullable=False, default=list)
+    exercises = Column(ARRAY(String), nullable=False, default=list)
+    sets_reps = Column(String)
+    equipment = Column(ARRAY(String), nullable=False, default=list)
+    status = Column(String(20), nullable=False)
+    user_edited = Column(Boolean, nullable=False, default=False)  # re-extraction skips edited rows
+    extractor_version = Column(String(10))
+    extracted_at = Column(DateTime)
+
 
 # Create tables if they don't exist
 Base.metadata.create_all(engine)

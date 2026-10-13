@@ -321,6 +321,55 @@ def show_title(item, key_prefix=""):
             st.rerun()
 
 
+BODY_AREA_ORDER = ["neck", "shoulders", "back", "chest", "arms", "core", "glutes", "hips", "legs", "face", "full body"]
+WORKOUT_STATUS = {
+    "exercises": "Exercise list",
+    "routine": "Routine / tip",
+    "how_to": "How-to",
+    "no_details": "No details in caption",
+    "no_caption": "No caption",
+}
+
+
+@st.cache_data(ttl=600)
+def load_workouts():
+    workouts = pd.read_sql(
+        text("""
+            SELECT w.*, p.url, p.owner_username, p.caption, p.collections, p.first_saved_at
+            FROM clean.workouts w
+            JOIN clean.saved_posts p USING (code)
+            ORDER BY cardinality(w.exercises) DESC, p.first_saved_at DESC NULLS LAST
+        """),
+        engine,
+    )
+    workouts = workouts.astype(object).where(workouts.notna(), None)
+    for column in ("body_areas", "exercises", "equipment", "collections"):
+        workouts[column] = workouts[column].apply(lambda values: values or [])
+    return workouts
+
+
+def show_workout(workout):
+    with st.container(border=True):
+        picture = thumbnail(workout.code)
+        if picture is not None:
+            st.image(picture, width="stretch")
+        elif removed_from_instagram(workout.code):
+            st.caption("🚫 No picture: removed from Instagram, or embedding turned off")
+        st.markdown(f"**{workout.title or 'Untitled'}**")
+        st.caption(" · ".join(x for x in [workout.workout_type, ", ".join(workout.body_areas)] if x)
+                   + (f"  \n@{workout.owner_username}" if workout.owner_username else ""))
+        if workout.exercises:
+            with st.expander(f"{len(workout.exercises)} exercises"):
+                st.markdown("\n".join(f"{i}. {e}" for i, e in enumerate(workout.exercises, 1)))
+        elif workout.sets_reps:
+            st.write(workout.sets_reps)
+        if workout.equipment:
+            st.caption("Equipment: " + ", ".join(workout.equipment))
+        st.markdown(f"[Instagram post]({workout.url})")
+        with st.expander("Caption"):
+            st.text(workout.caption or "")
+
+
 def matches(post, query):
     haystack = " ".join(
         [post["caption_text"], post["username"] or "", post["location_name"] or "", post["city"] or ""]
@@ -357,8 +406,8 @@ if picked_tags:
 if only_located:
     filtered = filtered[filtered["lat"].notna()]
 
-recipes_tab, travel_tab, watch_tab, browse_tab, export_tab = st.tabs(
-    ["Recipes", "Travel", "Watch / read", "Browse", "Instagram export"]
+recipes_tab, travel_tab, watch_tab, workouts_tab, browse_tab, export_tab = st.tabs(
+    ["Recipes", "Travel", "Watch / read", "Workouts", "Browse", "Instagram export"]
 )
 
 with recipes_tab:
@@ -507,6 +556,39 @@ with watch_tab:
         for post in no_title.itertuples():
             caption = (post.caption or "no caption").strip().splitlines()[0][:100]
             st.markdown(f"- [{post.owner_username or 'post'}]({post.url}) — {caption}")
+
+with workouts_tab:
+    workouts = load_workouts()
+    st.markdown("**What do you want to work on?**")
+    areas = st.pills(
+        "Body area", BODY_AREA_ORDER, selection_mode="multi", label_visibility="collapsed",
+        format_func=lambda a: f"{a} ({sum(a in b for b in workouts['body_areas'])})",
+    )
+    filters = st.columns([2, 2, 1])
+    workout_query = filters[0].text_input("Search workouts", placeholder="exercise, @user, word in caption")
+    workout_types = filters[1].multiselect("Type", sorted(workouts["workout_type"].dropna().unique()))
+    show_unclear = filters[2].toggle("Show posts without details", value=False)
+
+    shown = workouts
+    if not show_unclear:
+        shown = shown[~shown["status"].isin(["no_details", "no_caption"])]
+    if areas:
+        shown = shown[shown["body_areas"].apply(lambda b: bool(set(b) & set(areas)))]
+    if workout_types:
+        shown = shown[shown["workout_type"].isin(workout_types)]
+    if workout_query:
+        q = workout_query.lower()
+        shown = shown[shown.apply(
+            lambda w: q in " ".join([w["title"] or "", w["owner_username"] or "", w["caption"] or "", *w["exercises"]]).lower(),
+            axis=1,
+        )]
+
+    unclear = workouts["status"].isin(["no_details", "no_caption"]).sum()
+    st.write(f"{len(shown)} of {len(workouts)} posts" + ("" if show_unclear else f" · {unclear} without details hidden"))
+    columns = st.columns(3)
+    for i, workout in enumerate(shown.itertuples()):
+        with columns[i % 3]:
+            show_workout(workout)
 
 with browse_tab:
     st.write(f"{len(filtered):,} posts")
