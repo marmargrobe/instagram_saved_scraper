@@ -28,3 +28,6 @@ deleted/
 
 # Cached post thumbnails
 media/
+
+# Downloaded reference data (IMDb datasets)
+data/
