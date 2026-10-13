@@ -93,8 +93,30 @@ A short "what is this" plus tags. To be refined later; the content is varied.
 3. ✅ Travel tab (v1): `python -m src.data_cleaner.travel_extract` fills `clean.travel_places`
    (OpenStreetMap lookups cached in `clean.geocode_cache`); fixes made in the app are stored in
    `clean.travel_place_choices` and survive re-extraction
-4. Watch / read tab
-5. Remaining tabs
+4. ✅ Watch / read tab (v1): `python -m src.data_cleaner.imdb_load` loads IMDb movies/series into
+   `reference.imdb_titles`; `python -m src.data_cleaner.watch_read_extract` fills `clean.watch_read_titles`;
+   watched / not interested saved in `clean.watch_read_choices`
+5. Refresh pipeline (see below)
+6. Remaining tabs: Workouts, Journal prompts, Hobbies & projects, Business
+
+## Refresh pipeline (planned)
+Everything goes stale at different speeds, so one runner keeps it current:
+
+| Step | Depends on | Runs when |
+|---|---|---|
+| Import new Instagram export | zip in ~/Downloads | a new zip is there |
+| Recipes / Travel / Watch-read extraction | import | there are new posts (new posts only) |
+| IMDb reference data | — | older than 30 days |
+| Thumbnails | import | posts without a picture |
+
+- `python -m src.pipeline.refresh` (or `--only travel`); each step skips itself when there is nothing new
+- `ops.pipeline_runs` logs each step (start, end, status, rows, error)
+- App sidebar: "Last updated …" + **🔄 Update now** (runs in the background, shows step progress)
+- Optional weekly run with macOS launchd (runs at next wake if the Mac was asleep)
+- **Request new export helper:** Instagram pages can't be embedded (frame-blocking headers) and there is no
+  API for "Download your information", so the app shows the date range to request per account (from the
+  newest save in the database), opens Accounts Center → Download your information in a new tab, and lists
+  the choices to make (Saved, HTML, that date range). The refresh imports the zip once it is downloaded.
 
 ## Ideas backlog
 Everything mentioned so far, to come back to:
@@ -105,7 +127,8 @@ Everything mentioned so far, to come back to:
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
   which currently takes ~10 min for 32 posts).
 - **Journal prompts:** custom prompt categories; label prompts by hand in the app.
-- **Watch / read:** "today I want to watch/read" picker by genre.
+- **Watch / read:** ✅ "today I want to watch/read" picker by genre (v1). Next: OCR on cached thumbnails for the
+  posts with no title (9 of 19 in v1); "watch later" list order; streaming availability.
 - **Travel:** ✅ place types and zoom-linked charts (v1). Next: trip lists (Mars & Ags is a shared trip list
   with a friend); posts that list places without 📍 ("5 cafés in Kyoto: 1. … 2. …"); "visited" checkmarks;
   better types for places OpenStreetMap only knows as a city.
