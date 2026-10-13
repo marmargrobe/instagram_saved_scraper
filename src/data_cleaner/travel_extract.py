@@ -319,20 +319,23 @@ def choose_primary(rows):
         row["on_map"] = True
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--limit", type=int, default=0)
-    args = parser.parse_args()
-
+def run(limit=0, new_only=False):
+    """Find places in travel posts; returns a one-line summary.
+    new_only: only posts without places yet (posts where nothing was found are retried; lookups are cached)."""
     nlp = spacy.load("en_core_web_sm")
+    query = """
+        SELECT code, caption, collections, geotag_name, geotag_lat, geotag_lng
+        FROM clean.saved_posts WHERE 'travel' = ANY (tabs)
+    """
+    if new_only:
+        query += " AND code NOT IN (SELECT code FROM clean.travel_places)"
+    query += " ORDER BY first_saved_at DESC NULLS LAST"
     with engine.connect() as connection:
-        posts = connection.execute(text("""
-            SELECT code, caption, collections, geotag_name, geotag_lat, geotag_lng
-            FROM clean.saved_posts WHERE 'travel' = ANY (tabs)
-            ORDER BY first_saved_at DESC NULLS LAST
-        """)).all()
-        if args.limit:
-            posts = posts[: args.limit]
+        posts = connection.execute(text(query)).all()
+        if limit:
+            posts = posts[:limit]
+        if not posts:
+            return "no new travel posts"
         geocoder = Geocoder(connection)
         now = datetime.now()
         all_rows = []
@@ -373,9 +376,16 @@ def main():
         connection.commit()
 
     on_map = {r["code"] for r in all_rows if r["is_primary"]}
-    print(f"{len(posts)} travel posts: {len(on_map)} placed on the map, {len(posts) - len(on_map)} without a location")
-    print("Primary place from: " + ", ".join(f"{s} {n}" for s, n in Counter(r["source"] for r in all_rows if r["is_primary"]).most_common()))
-    print("Place types: " + ", ".join(f"{t} {n}" for t, n in Counter(r["place_type"] for r in all_rows if r["on_map"]).most_common()))
+    return (f"{len(posts)} travel posts: {len(on_map)} placed, {len(posts) - len(on_map)} without a location, "
+            f"{geocoder.calls} new lookups")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--new-only", action="store_true", help="only posts without places yet")
+    args = parser.parse_args()
+    print(run(limit=args.limit, new_only=args.new_only))
 
 
 if __name__ == "__main__":
