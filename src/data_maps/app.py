@@ -181,8 +181,8 @@ def load_places():
     candidates["lng"] = candidates["lng"].astype(float)
     candidates["place_type"] = candidates.apply(lambda c: c.chosen_type or c.place_type or "other", axis=1)
     # OpenStreetMap's name merges spellings ("Sequoia NP" / "Sequoia National Park")
-    candidates["label"] = candidates.apply(lambda c: (c.matched_name or c.name).split(",")[0].strip(), axis=1)
-    candidates["where"] = candidates.apply(lambda c: ", ".join(x for x in (c.city, c.region, c.country) if x), axis=1)
+    candidates["label"] = candidates.apply(lambda c: (c.matched_name or c["name"]).split(",")[0].strip(), axis=1)
+    candidates["area"] = candidates.apply(lambda c: ", ".join(x for x in (c.city, c.region, c.country) if x), axis=1)
 
     chosen = candidates["chosen_name"].notna()
     is_choice = (candidates["name"] == candidates["chosen_name"]) & (candidates["source"] == candidates["chosen_source"])
@@ -209,7 +209,7 @@ def fix_place_form(place, options):
     """Pick another candidate, change the type, or hide the post."""
     with st.expander("✏️ Fix this place"):
         with st.form(f"fix_{place.code}", border=False):
-            labels = [f"{o.label} ({o.source}) · {o.where}" for o in options.itertuples()]
+            labels = [f"{o.label} ({o.source}) · {o.area}" for o in options.itertuples()]
             current = next((i for i, o in enumerate(options.itertuples()) if o.id == place.id), 0)
             picked = st.selectbox("Place", range(len(labels)), index=current, format_func=labels.__getitem__)
             types = [t for t in PLACE_STYLE if t != "other"]
@@ -229,7 +229,7 @@ def show_place(place, options):
         elif removed_from_instagram(place.code):
             st.caption("🚫 Removed from Instagram")
         st.markdown(f"**{place.label}**")
-        st.caption(" · ".join(x for x in (place.place_type, place.where) if x)
+        st.caption(" · ".join(x for x in (place.place_type, place.area) if x)
                    + (f"  \n@{place.owner_username}" if place.owner_username else ""))
         st.markdown(f"[Instagram post]({place.url})")
         with st.expander("Caption"):
@@ -335,7 +335,7 @@ with travel_tab:
         if travel_query:
             q = travel_query.lower()
             shown = shown[shown.apply(
-                lambda p: q in " ".join([p.label, p.name, p.where, p.owner_username or ""]).lower(), axis=1
+                lambda p: q in " ".join([p["label"], p["name"], p["area"], p["owner_username"] or ""]).lower(), axis=1
             )]
         if travel_collections:
             shown = shown[shown["collections"].apply(lambda names: bool(set(names) & set(travel_collections)))]
@@ -351,7 +351,7 @@ with travel_tab:
             for place in shown.itertuples():
                 color, icon = PLACE_STYLE.get(place.place_type, PLACE_STYLE["other"])
                 popup = (
-                    f"<b>{place.label}</b><br>{place.place_type}<br>{place.where}<br>"
+                    f"<b>{place.label}</b><br>{place.place_type}<br>{place.area}<br>"
                     f"@{place.owner_username or ''}<br><a href='{place.url}' target='_blank'>Open on Instagram</a>"
                 )
                 folium.Marker(
