@@ -4,7 +4,9 @@ Any additional transformation scripts will go here. For instance, you could have
 from src.data_cleaner.utils_transformation import parse_dict_object, extract_key, extract_hashtags, extract_location_from_caption
 from sqlalchemy.orm import sessionmaker
 from src.helper.model import engine, CleanInstaSavedReel, RawstdInstaSavedReel, CleanInstaUser, CleanInstaUserTag
+from src.helper.utils_model import upsert_record
 import spacy
+import json
 
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -17,7 +19,7 @@ finally:
     # Close the session
     session.close()
 
-compute_transformations = False
+compute_transformations = True
 # switch on which transformations to do
 compute_extract_hashtags = False
 compute_extract_locations = False
@@ -25,9 +27,9 @@ compute_extract_user = False
 compute_extract_usertagged = False
 compute_extract_locations_from_caption = False
 
-# compute_extract_hashtags = True
-# compute_extract_locations = True
-# compute_extract_user = True
+compute_extract_hashtags = True
+compute_extract_locations = True
+compute_extract_user = True
 # compute_extract_usertagged = True
 compute_extract_locations_from_caption = True
 
@@ -166,51 +168,49 @@ if compute_extract_user:
                     insta_saved_reels_id=reel.id
                 )
                 session.add(new_usertagged)
-if compute_extract_locations or compute_extract_hashtags:
+
+columns_updated = ["last_updated", "hashtags","lng", "lat","city","location_name", "locations_from_caption"]
+if compute_extract_locations or compute_extract_hashtags or compute_extract_locations_from_caption:
     # Iterate through all_reels and insert data into CleanInstaSavedReel table
     for reel in rawstd_insta_saved_reels:
         # user = reel.user
         user_pk = reel.user_pk
-        clean_record = CleanInstaSavedReel(
-            id=reel.id,
-            pk=reel.pk,
-            code=reel.code,
-            taken_at=reel.taken_at,
-            media_type=reel.media_type,
-            image_versions2=reel.image_versions2,
-            product_type=reel.product_type,
-            thumbnail_url=reel.thumbnail_url,
-            location=reel.location,
-            user=reel.user,
-            comment_count=reel.comment_count,
-            comments_disabled=reel.comments_disabled,
-            # commenting_disabled_for_viewer=reel.commenting_disabled_for_viewer,
-            like_count=reel.like_count,
-            play_count=reel.play_count,
-            has_liked=reel.has_liked,
-            caption_text=reel.caption_text,
-            # accessibility_caption=reel.accessibility_caption,
-            usertags=reel.usertags,
-            sponsor_tags=reel.sponsor_tags,
-            video_url=reel.video_url,
-            view_count=reel.view_count,
-            video_duration=reel.video_duration,
-            # title=reel.title,
-            resources=reel.resources,
-            clips_metadata=reel.clips_metadata,
-            last_updated=reel.last_updated,
-            hashtags=reel.hashtags,
-            lng=reel.lng,
-            lat=reel.lat,
-            city=reel.city,
-            location_name=reel.location_name,
-            user_pk=user_pk,
-            locations_from_caption=reel.locations_from_caption
-        )
-
-        # Add the record to the session
-        session.add(clean_record)
-
+        break
+        reel_data = {
+            "id": reel.id,
+            "pk": reel.pk,
+            "code": reel.code,
+            "taken_at": reel.taken_at,
+            "media_type": reel.media_type,
+            "image_versions2": json.dumps(reel.image_versions2),
+            "product_type": reel.product_type,
+            "thumbnail_url": reel.thumbnail_url,
+            "location": json.dumps(reel.location),
+            "user": json.dumps(reel.user),
+            "comment_count": reel.comment_count,
+            "comments_disabled": reel.comments_disabled,
+            "like_count": reel.like_count,
+            "play_count": reel.play_count,
+            "has_liked": reel.has_liked,
+            "caption_text": reel.caption_text,
+            "usertags": json.dumps(reel.usertags),
+            "sponsor_tags": json.dumps(reel.sponsor_tags),
+            "video_url": reel.video_url,
+            "view_count": reel.view_count,
+            "video_duration": reel.video_duration,
+            "resources": json.dumps(reel.resources),
+            "clips_metadata": json.dumps(reel.clips_metadata),
+            "last_updated": reel.last_updated,
+            "hashtags": reel.hashtags,
+            "lng": reel.lng,
+            "lat": reel.lat,
+            "city": reel.city,
+            "location_name": reel.location_name,
+            "user_pk": user_pk,
+            "locations_from_caption": reel.locations_from_caption
+            }
+        print(reel_data)
+        upsert_record(session=session, target_table=CleanInstaSavedReel, unique_columns=["id"], data=reel_data, new_values=columns_updated)
     # Commit the transaction to insert all records
     session.commit()
 
