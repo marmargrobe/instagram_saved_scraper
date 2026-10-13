@@ -4,7 +4,7 @@ Any additional transformation scripts will go here. For instance, you could have
 from src.data_cleaner.utils_transformation import parse_dict_object, extract_key, extract_hashtags, extract_location_from_caption
 from sqlalchemy.orm import sessionmaker
 from src.helper.model import engine, CleanInstaSavedReel, RawstdInstaSavedReel, CleanInstaUser, CleanInstaUserTag
-from src.helper.utils_model import upsert_record
+from src.helper.utils_model import upsert_record, insert_record_with_conflict
 import spacy
 import json
 
@@ -169,13 +169,24 @@ if compute_extract_user:
                 )
                 session.add(new_usertagged)
 
+# clean.insta_saved_reels.user_pk references clean.insta_user, so add each reel's poster first
+for reel in rawstd_insta_saved_reels:
+    if reel.user_pk:
+        user_data = {
+            "id": reel.user_pk,
+            "username": reel.user_username,
+            "full_name": reel.user_full_name,
+            "profile_pic_url": reel.user_profile_pic_url,
+        }
+        insert_record_with_conflict(session=session, target_table=CleanInstaUser, unique_columns=["id"], data=user_data)
+session.commit()
+
 columns_updated = ["last_updated", "hashtags","lng", "lat","city","location_name", "locations_from_caption"]
 if compute_extract_locations or compute_extract_hashtags or compute_extract_locations_from_caption:
     # Iterate through all_reels and insert data into CleanInstaSavedReel table
     for reel in rawstd_insta_saved_reels:
         # user = reel.user
         user_pk = reel.user_pk
-        break
         reel_data = {
             "id": reel.id,
             "pk": reel.pk,

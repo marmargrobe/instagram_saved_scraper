@@ -12,6 +12,7 @@ __pycache__/
 # Ignore virtual environment directories
 .venv/
 .venv_data_cleaner/
+.venv_data_maps/
 
 # Ignore IDE-specific files
 .vscode/
