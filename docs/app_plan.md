@@ -127,8 +127,10 @@ Everything goes stale at different speeds, so one runner keeps it current:
 ## Ideas backlog
 Everything mentioned so far, to come back to:
 
-- **Workouts:** clickable human body/muscle map; pick a muscle group, see exercises for it (v1 has body-area
-  buttons using the same groups: neck, shoulders, back, chest, arms, core, glutes, hips, legs, face, full body).
+- **Workouts:** ✅ clickable body map (front/back, 15 muscles from wger.de drawings, shaded by number of saved
+  workouts; `python -m src.data_maps.build_muscle_map` rebuilds the assets). Next: extract specific muscles
+  (biceps vs triceps, quads vs hamstrings) instead of broad body areas; exercises from wger's database for a
+  selected muscle as suggestions.
 - **Recipes:** calorie estimate per recipe (ingredient parsing + USDA FoodData Central); edit a recipe in the
   app (fix name/labels/status; sets `user_edited` so re-extraction keeps the edit); split "what I eat in a day"
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,

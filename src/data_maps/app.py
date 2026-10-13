@@ -5,6 +5,7 @@ Run from the project root (so .env is found):
     source .venv_data_maps/bin/activate
     streamlit run src/data_maps/app.py
 """
+import json
 import os
 import random
 import subprocess
@@ -329,6 +330,68 @@ def show_title(item, key_prefix=""):
 
 
 BODY_AREA_ORDER = ["neck", "shoulders", "back", "chest", "arms", "core", "glutes", "hips", "legs", "face", "full body"]
+OFF_MAP_AREAS = ["neck", "hips", "face", "full body"]  # body areas the muscle map can't show (neck also via trapezius)
+
+# Clickable body map (assets built by src/data_maps/build_muscle_map.py from wger.de drawings, AGPL-3.0)
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+with open(os.path.join(ASSETS_DIR, "muscle_map.json")) as _file:
+    MUSCLES = json.load(_file)  # muscle id -> {"label": ..., "areas": [...]}
+with open(os.path.join(ASSETS_DIR, "muscle_map_front.svg"), encoding="utf-8") as _front, \
+        open(os.path.join(ASSETS_DIR, "muscle_map_back.svg"), encoding="utf-8") as _back:
+    BODY_MAP_HTML = (
+        f'<div class="bodymap"><figure>{_front.read()}<figcaption>Front</figcaption></figure>'
+        f'<figure>{_back.read()}<figcaption>Back</figcaption></figure></div>'
+    )
+BODY_MAP_CSS = """
+.bodymap { display: flex; gap: 12px; justify-content: center; }
+.bodymap figure { margin: 0; text-align: center; }
+.bodymap svg { height: 340px; width: auto; }
+.bodymap figcaption { font: 12px sans-serif; color: #888; }
+.muscle path { fill: var(--shade, #eadbd6); opacity: 0.9 !important; cursor: pointer; transition: fill 0.15s; }
+.muscle:hover path { fill: #f4a261; }
+.muscle.selected path { fill: #e4572e; }
+"""
+BODY_MAP_JS = """
+function shade(count, max) {
+    if (!count) return "#eadbd6";
+    const t = Math.min(1, count / Math.max(1, max));   // more saved workouts = darker
+    const mix = (a, b) => Math.round(a + (b - a) * t);
+    return `rgb(${mix(242, 168)}, ${mix(206, 92)}, ${mix(196, 80)})`;
+}
+export default function (component) {
+    const { setStateValue, parentElement, data } = component;
+    // The drawing owns the selection: keep it on the component so redraws don't reset it
+    const host = parentElement.host || parentElement;
+    if (!host.__selected) host.__selected = new Set(data.selected || []);
+    const selected = host.__selected;
+    parentElement.querySelectorAll(".muscle").forEach((muscle) => {
+        const key = muscle.dataset.muscle;
+        const count = data.counts[key] || 0;
+        muscle.style.setProperty("--shade", shade(count, data.max));
+        muscle.querySelector("title").textContent = `${data.labels[key]} · ${count} saved`;
+        muscle.classList.toggle("selected", selected.has(key));
+        muscle.onclick = () => {
+            selected.has(key) ? selected.delete(key) : selected.add(key);
+            muscle.classList.toggle("selected", selected.has(key));
+            setStateValue("selected", [...selected]);
+        };
+    });
+}
+"""
+body_map_component = st.components.v2.component("body_map", html=BODY_MAP_HTML, css=BODY_MAP_CSS, js=BODY_MAP_JS)
+
+
+def body_map(workouts, key="body_map"):
+    """Clickable front/back body; returns the selected muscle ids."""
+    counts = {
+        muscle: int(workouts["body_areas"].apply(lambda areas: bool(set(areas) & set(info["areas"]))).sum())
+        for muscle, info in MUSCLES.items()
+    }
+    selected = (st.session_state.get(key) or {}).get("selected", [])  # only used when the drawing first appears
+    data = {"counts": counts, "max": max(counts.values()), "selected": selected,
+            "labels": {m: info["label"] for m, info in MUSCLES.items()}}
+    result = body_map_component(data=data, default={"selected": []}, key=key, on_selected_change=lambda: None)
+    return sorted(result.selected or [])
 WORKOUT_STATUS = {
     "exercises": "Exercise list",
     "routine": "Routine / tip",
@@ -774,11 +837,19 @@ with watch_tab:
 
 with workouts_tab:
     workouts = load_workouts()
-    st.markdown("**What do you want to work on?**")
-    areas = st.pills(
-        "Body area", BODY_AREA_ORDER, selection_mode="multi", label_visibility="collapsed",
-        format_func=lambda a: f"{a} ({sum(a in b for b in workouts['body_areas'])})",
-    )
+    st.markdown("**What do you want to work on?** Click muscles on the body (click again to unselect).")
+    map_col, extra_col = st.columns([3, 2])
+    with map_col:
+        muscles = body_map(workouts)
+    with extra_col:
+        if muscles:
+            st.markdown("**Selected:** " + ", ".join(MUSCLES[m]["label"] for m in muscles))
+        extra_areas = st.pills(
+            "Also", OFF_MAP_AREAS, selection_mode="multi",
+            format_func=lambda a: f"{a} ({sum(a in b for b in workouts['body_areas'])})",
+        )
+        st.caption("Darker muscles have more saved workouts. Body drawings: [wger](https://wger.de) (AGPL-3.0).")
+    areas = sorted({a for m in muscles for a in MUSCLES[m]["areas"]} | set(extra_areas or []))
     filters = st.columns([2, 2, 1])
     workout_query = filters[0].text_input("Search workouts", placeholder="exercise, @user, word in caption")
     workout_types = filters[1].multiselect("Type", sorted(workouts["workout_type"].dropna().unique()))
