@@ -99,7 +99,10 @@ A short "what is this" plus tags. To be refined later; the content is varied.
 5. Refresh pipeline (see below)
 6. ✅ Workouts tab (v1): `python -m src.data_cleaner.workouts_extract` fills `clean.workouts` (keyword rules:
    body areas, type, exercises with sets, equipment); body-area buttons in the app
-7. Remaining tabs: Journal prompts, Hobbies & projects, Business
+7. ✅ Journal prompts tab (v1): `python -m src.data_cleaner.journal_prompts_extract` fills
+   `clean.journal_prompts` (one row per prompt); my categories / favorite / used / hidden in
+   `clean.journal_prompt_choices`, keyed by prompt text so they survive re-extraction
+8. Remaining tabs: Hobbies & projects, Business
 
 ## Refresh pipeline (planned)
 Everything goes stale at different speeds, so one runner keeps it current:
@@ -129,7 +132,8 @@ Everything mentioned so far, to come back to:
   app (fix name/labels/status; sets `user_edited` so re-extraction keeps the edit); split "what I eat in a day"
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
   which currently takes ~10 min for 32 posts).
-- **Journal prompts:** custom prompt categories; label prompts by hand in the app.
+- **Journal prompts:** ✅ custom categories and labeling in the app (v1). Next: a writing box to answer a prompt
+  and keep the entry; export favorites as a printable list.
 - **Watch / read recommendations:** "more like the films I saved". Free and local: add IMDb's
   `title.principals` + `name.basics` (directors, actors, composers), build a profile per film (genres, decade,
   director, cast, composer) and rank well-rated films by cosine similarity (scikit-learn), with reasons

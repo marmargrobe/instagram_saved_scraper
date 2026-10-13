@@ -370,6 +370,69 @@ def show_workout(workout):
             st.text(workout.caption or "")
 
 
+@st.cache_data(ttl=600)
+def load_prompts():
+    prompts = pd.read_sql(
+        text("""
+            SELECT j.id, j.code, j.position, j.prompt, j.prompt_key, j.kind, j.heading,
+                   coalesce(c.category, j.category) AS category,
+                   coalesce(c.favorite, false) AS favorite, coalesce(c.used, false) AS used,
+                   coalesce(c.hidden, false) AS hidden, p.url, p.owner_username
+            FROM clean.journal_prompts j
+            JOIN clean.saved_posts p USING (code)
+            LEFT JOIN clean.journal_prompt_choices c USING (prompt_key)
+            ORDER BY j.code, j.position
+        """),
+        engine,
+    )
+    prompts = prompts.astype(object).where(prompts.notna(), None)
+    for column in ("favorite", "used", "hidden"):
+        prompts[column] = prompts[column].astype(bool)
+    return prompts.drop_duplicates("prompt_key")
+
+
+def save_prompt_choice(prompt, **changes):
+    values = {"category": prompt.category, "favorite": prompt.favorite, "used": prompt.used,
+              "hidden": prompt.hidden, **changes, "key": prompt.prompt_key}
+    with engine.begin() as connection:
+        connection.execute(
+            text("""
+                INSERT INTO clean.journal_prompt_choices (prompt_key, category, favorite, used, hidden, updated_at)
+                VALUES (:key, :category, :favorite, :used, :hidden, now())
+                ON CONFLICT (prompt_key) DO UPDATE SET category = :category, favorite = :favorite,
+                    used = :used, hidden = :hidden, updated_at = now()
+            """),
+            values,
+        )
+    load_prompts.clear()
+
+
+def show_prompt(prompt, categories):
+    with st.container(border=True):
+        text_col, actions = st.columns([5, 3])
+        heading = f"**{prompt.heading}** · " if prompt.heading else ""
+        text_col.markdown(heading + prompt.prompt + (" ⭐" if prompt.favorite else "") + (" ✍️" if prompt.used else ""))
+        text_col.caption(f"[@{prompt.owner_username or 'post'}]({prompt.url})")
+        buttons = actions.columns(3)
+        if buttons[0].button("⭐", key=f"fav_{prompt.prompt_key}", help="Favorite"):
+            save_prompt_choice(prompt, favorite=not prompt.favorite)
+            st.rerun()
+        if buttons[1].button("✍️", key=f"used_{prompt.prompt_key}", help="Mark as used (journaled about it)"):
+            save_prompt_choice(prompt, used=not prompt.used)
+            st.rerun()
+        if buttons[2].button("🙈", key=f"hide_{prompt.prompt_key}", help="Hide"):
+            save_prompt_choice(prompt, hidden=True)
+            st.rerun()
+        new_category = actions.selectbox(
+            "Category", categories, index=categories.index(prompt.category) if prompt.category in categories else None,
+            key=f"cat_{prompt.prompt_key}", label_visibility="collapsed", accept_new_options=True,
+            placeholder="Category (or type a new one)",
+        )
+        if new_category and new_category != prompt.category:
+            save_prompt_choice(prompt, category=new_category)
+            st.rerun()
+
+
 def matches(post, query):
     haystack = " ".join(
         [post["caption_text"], post["username"] or "", post["location_name"] or "", post["city"] or ""]
@@ -406,8 +469,8 @@ if picked_tags:
 if only_located:
     filtered = filtered[filtered["lat"].notna()]
 
-recipes_tab, travel_tab, watch_tab, workouts_tab, browse_tab, export_tab = st.tabs(
-    ["Recipes", "Travel", "Watch / read", "Workouts", "Browse", "Instagram export"]
+recipes_tab, travel_tab, watch_tab, workouts_tab, journal_tab, browse_tab, export_tab = st.tabs(
+    ["Recipes", "Travel", "Watch / read", "Workouts", "Journal prompts", "Browse", "Instagram export"]
 )
 
 with recipes_tab:
@@ -589,6 +652,50 @@ with workouts_tab:
     for i, workout in enumerate(shown.itertuples()):
         with columns[i % 3]:
             show_workout(workout)
+
+with journal_tab:
+    prompts = load_prompts()
+    visible = prompts[~prompts["hidden"]]
+    categories = sorted(visible["category"].dropna().unique())
+
+    st.subheader("✨ A prompt for today")
+    today = st.columns([2, 1])
+    today_category = today[0].selectbox("From", ["Any category"] + categories, label_visibility="collapsed")
+    pool = visible[~visible["used"]]
+    if today_category != "Any category":
+        pool = pool[pool["category"] == today_category]
+    if today[1].button("🔀 Another one", disabled=pool.empty) or st.session_state.get("prompt_of_day") not in set(pool["prompt_key"]):
+        st.session_state["prompt_of_day"] = random.choice(list(pool["prompt_key"])) if not pool.empty else None
+    todays = pool[pool["prompt_key"] == st.session_state.get("prompt_of_day")]
+    if todays.empty:
+        st.caption("No unused prompts here.")
+    else:
+        st.info(next(todays.itertuples()).prompt)
+
+    st.divider()
+    picked_categories = st.pills(
+        "Categories", categories, selection_mode="multi",
+        format_func=lambda c: f"{c} ({(visible['category'] == c).sum()})",
+    )
+    filters = st.columns([1, 2, 1])
+    prompt_kind = filters[0].radio("Kind", ["All", "Questions", "ChatGPT"], horizontal=True, label_visibility="collapsed")
+    prompt_query = filters[1].text_input("Search prompts", placeholder="word in a prompt", label_visibility="collapsed")
+    favorites_only = filters[2].toggle("Favorites only")
+
+    shown = visible
+    if picked_categories:
+        shown = shown[shown["category"].isin(picked_categories)]
+    if prompt_kind != "All":
+        shown = shown[shown["kind"] == {"Questions": "question", "ChatGPT": "chatgpt"}[prompt_kind]]
+    if prompt_query:
+        shown = shown[shown["prompt"].str.contains(prompt_query, case=False, regex=False)]
+    if favorites_only:
+        shown = shown[shown["favorite"]]
+
+    st.write(f"{len(shown)} of {len(visible)} prompts · {int(visible['used'].sum())} used · "
+             f"{int(prompts['hidden'].sum())} hidden")
+    for prompt in shown.itertuples():
+        show_prompt(prompt, categories)
 
 with browse_tab:
     st.write(f"{len(filtered):,} posts")
