@@ -46,7 +46,9 @@ def removed_marker(code):
 def posts_without_thumbnail(tab, limit, retry_removed=False):
     query = "SELECT code, url FROM clean.saved_posts"
     params = {}
-    if tab != "all":
+    if tab == "any":  # every post that is in one of the app's tabs
+        query += " WHERE cardinality(tabs) > 0"
+    elif tab != "all":
         query += " WHERE :tab = ANY (tabs)"
         params["tab"] = tab
     query += " ORDER BY first_saved_at DESC NULLS LAST"
@@ -80,17 +82,11 @@ def image_url(driver, post_url):
     return image.get_property("currentSrc") or image.get_dom_attribute("src")
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--tab", default="recipes", help="app tab to fetch for (recipes, travel, ...) or 'all'")
-    parser.add_argument("--limit", type=int, default=0, help="stop after this many posts (0 = no limit)")
-    parser.add_argument("--retry-removed", action="store_true", help="also retry posts marked as removed")
-    args = parser.parse_args()
-
-    posts = posts_without_thumbnail(args.tab, args.limit, args.retry_removed)
+def run(tab="any", limit=0, retry_removed=False):
+    """Fetch missing thumbnails; returns a one-line summary."""
+    posts = posts_without_thumbnail(tab, limit, retry_removed)
     if not posts:
-        print("Every post already has a thumbnail.")
-        return
+        return "every post already has a thumbnail"
     os.makedirs(THUMBNAIL_DIR, exist_ok=True)
     print(f"Fetching {len(posts)} thumbnails into {os.path.relpath(THUMBNAIL_DIR, PROJECT_ROOT)}/")
 
@@ -115,12 +111,16 @@ def main():
             time.sleep(random.uniform(1.0, 2.5))  # go easy on Instagram
     finally:
         driver.quit()
+    return f"saved {saved}, no picture for {len(removed)} (removed or embedding off), failed {len(missing)}"
 
-    print(f"Saved {saved}, removed from Instagram {len(removed)}, no image for {len(missing)}")
-    if removed:
-        print("  Removed: " + ", ".join(removed))
-    if missing:
-        print("  No image: " + ", ".join(missing))
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--tab", default="recipes", help="app tab (recipes, travel, ...), 'any' (all tabs) or 'all' posts")
+    parser.add_argument("--limit", type=int, default=0, help="stop after this many posts (0 = no limit)")
+    parser.add_argument("--retry-removed", action="store_true", help="also retry posts marked as removed")
+    args = parser.parse_args()
+    print(run(args.tab, args.limit, args.retry_removed))
 
 
 if __name__ == "__main__":

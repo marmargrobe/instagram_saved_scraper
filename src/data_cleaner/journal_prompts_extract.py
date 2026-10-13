@@ -91,7 +91,8 @@ def category_for(prompt, kind, relationship_post):
     return None
 
 
-def main():
+def run():
+    """Run the extraction; returns a one-line summary."""
     now = datetime.now()
     rows = []
     with engine.connect() as connection:
@@ -127,8 +128,11 @@ def main():
             """), rows)
         connection.commit()
 
-    print(f"{len(rows)} prompts from {len({r['code'] for r in rows})} of {len(posts)} Journals posts with a caption")
-    print("Categories: " + ", ".join(f"{c} {n}" for c, n in Counter(r["category"] for r in rows).most_common()))
+    return f"{len(rows)} prompts from {len({r['code'] for r in rows})} of {len(posts)} Journals posts with a caption"
+
+
+def main():
+    print(run())
 
 
 if __name__ == "__main__":

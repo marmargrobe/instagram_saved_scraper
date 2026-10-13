@@ -7,6 +7,7 @@ Run from the project root (so .env is found):
 """
 import os
 import random
+import subprocess
 import sys
 
 # Streamlit puts this file's folder on sys.path, not the project root
@@ -23,7 +24,13 @@ from streamlit_folium import st_folium
 
 from src.helper.model import engine
 
-THUMBNAIL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "media", "thumbnails")
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+THUMBNAIL_DIR = os.path.join(PROJECT_ROOT, "media", "thumbnails")
+# The refresh needs the libraries in the cleaner venv (spaCy, transformers, selenium, ...)
+CLEANER_PYTHON = os.path.join(PROJECT_ROOT, ".venv_data_cleaner", "bin", "python")
+REFRESH_LOG = os.path.join(PROJECT_ROOT, "logs", "refresh.log")
+DOWNLOAD_YOUR_INFORMATION = "https://accountscenter.instagram.com/info_and_permissions/dyi/"
+STEP_ICONS = {"running": "⏳", "done": "✅", "skipped": "⏭️", "failed": "❌"}
 POST_CODE = r"instagram\.com/(?:reel|p|tv)/([^/?#]+)"
 
 st.set_page_config(page_title="Saved Instagram", page_icon="📍", layout="wide")
@@ -433,6 +440,84 @@ def show_prompt(prompt, categories):
             st.rerun()
 
 
+def latest_run():
+    """Steps of the most recent refresh, and when the last refresh finished."""
+    with engine.connect() as connection:
+        steps = connection.execute(text("""
+            SELECT step, status, summary, error, started_at, finished_at FROM ops.pipeline_runs
+            WHERE run_id = (SELECT run_id FROM ops.pipeline_runs ORDER BY started_at DESC LIMIT 1)
+            ORDER BY id
+        """)).mappings().all()
+        last_finished = connection.execute(text("""
+            SELECT max(finished_at) FROM ops.pipeline_runs
+            WHERE run_id IN (SELECT run_id FROM ops.pipeline_runs GROUP BY run_id
+                             HAVING bool_and(status <> 'running'))
+        """)).scalar()
+    return steps, last_finished
+
+
+def start_refresh():
+    os.makedirs(os.path.dirname(REFRESH_LOG), exist_ok=True)
+    with open(REFRESH_LOG, "a") as log:
+        subprocess.Popen(
+            [CLEANER_PYTHON, "-W", "ignore", "-m", "src.pipeline.refresh", "--triggered-by", "app"],
+            cwd=PROJECT_ROOT, stdout=log, stderr=subprocess.STDOUT,
+            start_new_session=True,  # keeps running even if the app reloads
+        )
+    st.session_state["refresh_started"] = True
+
+
+def refresh_panel():
+    steps, last_finished = latest_run()
+    running = any(s["status"] == "running" for s in steps) or (
+        st.session_state.get("refresh_started") and not steps
+    )
+
+    @st.fragment(run_every=3 if running else None)
+    def progress():
+        steps, last_finished = latest_run()
+        still_running = any(s["status"] == "running" for s in steps)
+        if st.session_state.get("refresh_started") and steps and not still_running:
+            st.session_state["refresh_started"] = False
+            st.cache_data.clear()  # show the new data in every tab
+            st.rerun()
+        st.caption(f"Last updated: {last_finished:%b %d, %I:%M %p}" if last_finished else "Not refreshed yet")
+        if st.button("🔄 Update now", disabled=still_running, width="stretch"):
+            start_refresh()
+            st.rerun()
+        if steps and (still_running or st.session_state.get("show_last_run")):
+            for s in steps:
+                st.caption(f"{STEP_ICONS.get(s['status'], '·')} {s['step']}: {s['summary'] or s['error'] or ''}"[:120])
+        elif steps:
+            failed = [s["step"] for s in steps if s["status"] == "failed"]
+            if failed:
+                st.error(f"Last refresh failed at: {', '.join(failed)}")
+            if st.button("Show last run", type="tertiary"):
+                st.session_state["show_last_run"] = True
+                st.rerun()
+
+    progress()
+
+
+def request_export_panel():
+    with engine.connect() as connection:
+        newest = connection.execute(text("""
+            SELECT insta_account, max(added_time) FROM rawstd.insta_download_saved_reels
+            GROUP BY insta_account ORDER BY insta_account
+        """)).all()
+    with st.expander("📥 Request a new Instagram export"):
+        st.markdown("Request these date ranges (since the newest save already loaded):")
+        for account, latest in newest:
+            st.markdown(f"- **{account}**: {latest:%b %d, %Y} → today" if latest else f"- **{account}**: all time")
+        st.link_button("Open Instagram › Download your information", DOWNLOAD_YOUR_INFORMATION, width="stretch")
+        st.markdown(
+            "1. **Download or transfer information** → choose the account\n"
+            "2. **Some of your information** → **Saved** (under Your Instagram activity)\n"
+            "3. **Download to device** → date range above, format **HTML**\n"
+            "4. When the email arrives, download the zip to **~/Downloads** and press **🔄 Update now**"
+        )
+
+
 def matches(post, query):
     haystack = " ".join(
         [post["caption_text"], post["username"] or "", post["location_name"] or "", post["city"] or ""]
@@ -451,6 +536,10 @@ st.caption(
 )
 
 with st.sidebar:
+    st.header("Data")
+    refresh_panel()
+    request_export_panel()
+    st.divider()
     st.header("Browse filters")
     query = st.text_input("Search", placeholder="caption, @user, place, #tag, collection")
     all_collections = sorted({name for names in posts["collections"] for name in names})
