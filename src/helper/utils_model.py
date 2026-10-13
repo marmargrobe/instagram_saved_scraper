@@ -206,7 +206,8 @@ def insert_record_with_conflict(session, target_table, unique_columns, data):
 
         # If no rows were inserted (i.e., conflict occurred), log it
         if result.rowcount == 0:
-            logger.warn(f"Conflict found for collection '{data[unique_columns[0]]}' and account '{data[unique_columns[1]]}'. No new data inserted.")
+            key = ", ".join(f"{col}='{data.get(col)}'" for col in unique_columns)
+            logger.warning(f"Conflict found for {target_table.__tablename__} ({key}). No new data inserted.")
 
     except Exception as e:
         # Log any unexpected errors
