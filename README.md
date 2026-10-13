@@ -10,6 +10,7 @@ and organizes them, and shows them in a local Streamlit app.
   - [Cleaning the data](#cleaning-the-data)
   - [Reference data (IMDb)](#reference-data-imdb)
   - [Thumbnails](#thumbnails)
+  - [Refresh pipeline](#refresh-pipeline)
   - [The app](#the-app)
   - [Docker (old AWS setup)](#docker-old-aws-setup)
   - [Credits](#credits)
@@ -97,6 +98,19 @@ python -m src.data_scraper_downloads.fetch_thumbnails --tab recipes   # or trave
 It opens each post's public embed page (no login) in headless Chrome and saves the cover image
 to `media/thumbnails/<code>.jpg` (gitignored). Posts removed from Instagram get a `.removed`
 marker. Already-fetched posts are skipped, so run it again after each import.
+
+### Refresh pipeline
+
+One command runs every step in order; each step skips itself when there is nothing new:
+```
+.venv_data_cleaner/bin/python -m src.pipeline.refresh                 # import → imdb → recipes → travel → watch_read → workouts → journal → thumbnails
+.venv_data_cleaner/bin/python -m src.pipeline.refresh --only travel   # one or more steps
+```
+- Each step is logged in `ops.pipeline_runs`; a failed step is logged and the rest still run; only one refresh runs at a time.
+- In the app: sidebar **Data** → "Last updated", **🔄 Update now** (runs in the background with live step progress)
+  and **📥 Request a new Instagram export** (date range per account + link to Instagram's download page).
+- Weekly (optional): `scripts/install_weekly_refresh.sh` adds a macOS launchd job for Sundays 9:00
+  (`--uninstall` removes it). Output goes to `logs/refresh.log` (gitignored).
 
 ### The app
 

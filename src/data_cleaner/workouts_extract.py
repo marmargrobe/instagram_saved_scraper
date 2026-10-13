@@ -144,7 +144,8 @@ def extract(code, caption, collections):
     return row
 
 
-def main():
+def run():
+    """Run the extraction; returns a one-line summary."""
     with engine.connect() as connection:
         posts = connection.execute(text(
             "SELECT code, caption, collections FROM clean.saved_posts WHERE 'workouts' = ANY (tabs)"
@@ -160,9 +161,11 @@ def main():
     with engine.begin() as connection:
         connection.execute(statement)
 
-    print(f"{len(rows)} workout posts: " + ", ".join(f"{s} {n}" for s, n in Counter(r["status"] for r in rows).most_common()))
-    print("Types: " + ", ".join(f"{t} {n}" for t, n in Counter(r["workout_type"] for r in rows).most_common()))
-    print("Body areas: " + ", ".join(f"{a} {n}" for a, n in Counter(a for r in rows for a in r["body_areas"]).most_common()))
+    return f"{len(rows)} workout posts: " + ", ".join(f"{s} {n}" for s, n in Counter(r["status"] for r in rows).most_common())
+
+
+def main():
+    print(run())
 
 
 if __name__ == "__main__":
