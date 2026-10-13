@@ -97,7 +97,9 @@ A short "what is this" plus tags. To be refined later; the content is varied.
    `reference.imdb_titles`; `python -m src.data_cleaner.watch_read_extract` fills `clean.watch_read_titles`;
    watched / not interested saved in `clean.watch_read_choices`
 5. Refresh pipeline (see below)
-6. Remaining tabs: Workouts, Journal prompts, Hobbies & projects, Business
+6. ✅ Workouts tab (v1): `python -m src.data_cleaner.workouts_extract` fills `clean.workouts` (keyword rules:
+   body areas, type, exercises with sets, equipment); body-area buttons in the app
+7. Remaining tabs: Journal prompts, Hobbies & projects, Business
 
 ## Refresh pipeline (planned)
 Everything goes stale at different speeds, so one runner keeps it current:
@@ -121,12 +123,21 @@ Everything goes stale at different speeds, so one runner keeps it current:
 ## Ideas backlog
 Everything mentioned so far, to come back to:
 
-- **Workouts:** clickable human body/muscle map; pick a muscle group, see exercises for it.
+- **Workouts:** clickable human body/muscle map; pick a muscle group, see exercises for it (v1 has body-area
+  buttons using the same groups: neck, shoulders, back, chest, arms, core, glutes, hips, legs, face, full body).
 - **Recipes:** calorie estimate per recipe (ingredient parsing + USDA FoodData Central); edit a recipe in the
   app (fix name/labels/status; sets `user_edited` so re-extraction keeps the edit); split "what I eat in a day"
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
   which currently takes ~10 min for 32 posts).
 - **Journal prompts:** custom prompt categories; label prompts by hand in the app.
+- **Watch / read recommendations:** "more like the films I saved". Free and local: add IMDb's
+  `title.principals` + `name.basics` (directors, actors, composers), build a profile per film (genres, decade,
+  director, cast, composer) and rank well-rated films by cosine similarity (scikit-learn), with reasons
+  ("same director: Paul Thomas Anderson"). Optional second opinion: TMDB's free similar/recommendations API
+  (needs a free API key).
+- **Movies from my music (separate project):** Spotify API (free developer account) for top artists/genres;
+  MusicBrainz / Wikidata to link artists and composers to film soundtracks. Spotify's audio-features and
+  recommendations endpoints were closed to new apps in late 2024, so mood matching may not be possible.
 - **Watch / read:** ✅ "today I want to watch/read" picker by genre (v1). Next: OCR on cached thumbnails for the
   posts with no title (9 of 19 in v1); "watch later" list order; streaming availability.
 - **Travel:** ✅ place types and zoom-linked charts (v1). Next: trip lists (Mars & Ags is a shared trip list
