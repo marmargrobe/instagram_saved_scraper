@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import folium
 import pandas as pd
+from PIL import Image
 import streamlit as st
 from folium.plugins import MarkerCluster
 from sqlalchemy import text
@@ -20,6 +21,7 @@ from streamlit_folium import st_folium
 
 from src.helper.model import engine
 
+THUMBNAIL_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "media", "thumbnails")
 POST_CODE = r"instagram\.com/(?:reel|p|tv)/([^/?#]+)"
 
 st.set_page_config(page_title="Saved Instagram", page_icon="📍", layout="wide")
@@ -62,6 +64,88 @@ def load_saves():
     return saves
 
 
+RECIPE_STATUS = {
+    "full": "Full recipe",
+    "ingredients_only": "Ingredients",
+    "external": "Recipe elsewhere",
+    "description_only": "Name only",
+    "not_a_recipe": "Not a recipe",
+    "no_caption": "No caption",
+}
+
+
+@st.cache_data(ttl=600)
+def load_recipes():
+    recipes = pd.read_sql(
+        text("""
+            SELECT r.*, p.url, p.owner_username, p.caption, p.first_saved_at
+            FROM clean.recipes r
+            JOIN clean.saved_posts p USING (code)
+            ORDER BY p.first_saved_at DESC NULLS LAST
+        """),
+        engine,
+    )
+    recipes = recipes.astype(object).where(recipes.notna(), None)  # NaN -> None so blanks stay blank
+    for column in ("ingredients", "steps", "diet_tags"):
+        recipes[column] = recipes[column].apply(lambda values: values or [])
+    return recipes
+
+
+@st.cache_data
+def thumbnail(code, ratio=4 / 5):
+    """Cached cover image cropped to width/height = ratio, or None."""
+    path = os.path.join(THUMBNAIL_DIR, f"{code}.jpg")
+    if not os.path.exists(path):
+        return None
+    image = Image.open(path)
+    width, height = image.size
+    if width / height < ratio:  # too tall: keep the middle
+        new_height = int(width / ratio)
+        top = (height - new_height) // 2
+        image = image.crop((0, top, width, top + new_height))
+    image.thumbnail((600, 750))
+    return image
+
+
+def removed_from_instagram(code):
+    return os.path.exists(os.path.join(THUMBNAIL_DIR, f"{code}.removed"))
+
+
+def show_recipe(recipe):
+    with st.container(border=True):
+        picture = thumbnail(recipe.code)
+        if picture is not None:
+            st.image(picture, width="stretch")
+        elif removed_from_instagram(recipe.code):
+            st.caption("🚫 Removed from Instagram")
+        st.markdown(f"**{recipe.recipe_name or 'Untitled'}**")
+        badges = [RECIPE_STATUS[recipe.status], recipe.meal_type, recipe.cuisine, *recipe.diet_tags]
+        st.caption(" · ".join(b for b in badges if b) + (f"  \n@{recipe.owner_username}" if recipe.owner_username else ""))
+        if recipe.servings:
+            st.write(f"Serves {recipe.servings}")
+        if recipe.ingredients or recipe.steps:
+            with st.expander(f"{len([i for i in recipe.ingredients if not i.endswith(':')])} ingredients · {len(recipe.steps)} steps"):
+                if recipe.ingredients:
+                    st.markdown("\n".join(f"**{i}**" if i.endswith(":") else f"- {i}" for i in recipe.ingredients))
+                if recipe.steps:
+                    st.markdown("**Steps**")
+                    number = 0
+                    lines = []
+                    for step in recipe.steps:
+                        if step.endswith(":"):
+                            lines.append(f"\n**{step}**\n")
+                        else:
+                            number += 1
+                            lines.append(f"{number}. {step}")
+                    st.markdown("\n".join(lines))
+        if recipe.how_to_get:
+            st.write(f"To get it: {recipe.how_to_get}")
+        links = [f"[Instagram post]({recipe.url})"] + ([f"[Recipe link]({recipe.recipe_link})"] if recipe.recipe_link else [])
+        st.markdown(" · ".join(links))
+        with st.expander("Caption"):
+            st.text(recipe.caption or "")
+
+
 def matches(post, query):
     haystack = " ".join(
         [post["caption_text"], post["username"] or "", post["location_name"] or "", post["city"] or ""]
@@ -98,7 +182,38 @@ if picked_tags:
 if only_located:
     filtered = filtered[filtered["lat"].notna()]
 
-map_tab, browse_tab, export_tab = st.tabs(["Map", "Browse", "Instagram export"])
+recipes_tab, map_tab, browse_tab, export_tab = st.tabs(["Recipes", "Map", "Browse", "Instagram export"])
+
+with recipes_tab:
+    recipes = load_recipes()
+    filters = st.columns([2, 1, 1, 1])
+    recipe_query = filters[0].text_input("Search recipes", placeholder="name, ingredient, @user")
+    meal_types = filters[1].multiselect("Meal type", sorted(recipes["meal_type"].dropna().unique()))
+    cuisines = filters[2].multiselect("Cuisine", sorted(recipes["cuisine"].dropna().unique()))
+    diets = filters[3].multiselect("Diet", sorted({tag for tags in recipes["diet_tags"] for tag in tags}))
+    statuses = st.pills(
+        "Show", list(RECIPE_STATUS), format_func=RECIPE_STATUS.get, selection_mode="multi",
+        default=["full", "ingredients_only", "external", "description_only"],
+    )
+
+    shown = recipes[recipes["status"].isin(statuses or list(RECIPE_STATUS))]
+    if recipe_query:
+        q = recipe_query.lower()
+        shown = shown[shown.apply(
+            lambda r: q in " ".join([r.recipe_name or "", r.owner_username or "", " ".join(r.ingredients)]).lower(), axis=1
+        )]
+    if meal_types:
+        shown = shown[shown["meal_type"].isin(meal_types)]
+    if cuisines:
+        shown = shown[shown["cuisine"].isin(cuisines)]
+    if diets:
+        shown = shown[shown["diet_tags"].apply(lambda tags: bool(set(tags) & set(diets)))]
+
+    st.write(f"{len(shown)} of {len(recipes)} recipe posts")
+    columns = st.columns(3)
+    for i, recipe in enumerate(shown.itertuples()):
+        with columns[i % 3]:
+            show_recipe(recipe)
 
 with map_tab:
     located = filtered.dropna(subset=["lat", "lng"])
@@ -142,7 +257,7 @@ with browse_tab:
             "like_count": st.column_config.NumberColumn("Likes", format="%d"),
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=600,
     )
 
