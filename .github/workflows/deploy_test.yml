@@ -2,9 +2,9 @@ name: Deploy to prod
 
 # on:
 #   workflow_dispatch:
+# Manual only: the AWS resources this deployed to no longer exist (see README, Docker section)
 on:
-  push:
-    branches: [ master ]
+  workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-18.04
