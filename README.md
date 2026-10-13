@@ -1,116 +1,109 @@
-## Instagram saved collections scraper
+## Instagram saved posts
 
-  - [Motivation](#motivation)
-  - [Pre-requisites](#pre-requisites)
-  - [How to run?](#how-to-run)
-  - [What are collections and how do I know collections ID?](#what-are-collections-and-how-do-i-know-collections-id)
-  - [What data is saved?](#what-data-is-saved)
-  - [What if I want to fetch data of all my saved posts?](#what-if-i-want-to-fetch-data-of-all-my-saved-posts)
-  - [:exclamation::exclamation: Credentials storage :exclamation::exclamation:](#exclamation-exclamation-credentials-storage-exclamation-exclamation)
+I save a lot of posts on Instagram (recipes, travel spots, movies, workouts, journal prompts)
+and never go back to them. This project pulls my saved posts into a Postgres database, cleans
+and organizes them, and shows them in a local Streamlit app.
+
+  - [How it works](#how-it-works)
+  - [Setup](#setup)
+  - [Importing a new Instagram export](#importing-a-new-instagram-export)
+  - [Cleaning the data](#cleaning-the-data)
+  - [The app](#the-app)
+  - [Docker (old AWS setup)](#docker-old-aws-setup)
   - [Credits](#credits)
 
-### Motivation
-I usually save posts and categorize them in collections on Instagram, so that I can access them later. However, it's not very conveninent to go through them as the list grows big over time. Also, I cannot share that list with my friends if I have to. So I created this very 'hacky' script to login to Instagram account, go find the saved items I want, and pull out related data into csv file, which be saved or shared with others.
-____________
+### How it works
 
-### Pre-requisites
-This script works with Python 3
-`pip` is required to download dependencies
-____________
+```
+Instagram ──► src/data_scraper/            (2024: API scrape with instagrapi)      ─┐
+          └─► src/data_scraper_downloads/  ("Download your information" exports)  ─┴─► rawstd.* tables
+                                                                                         │
+                       src/data_cleaner/  (parse locations, users, hashtags; categorize) ◄┘ ─► clean.* tables
+                                                                                         │
+                       src/data_maps/app.py  (Streamlit app)                            ◄┘
+```
 
-### How to run?
+- `rawstd.*` tables hold the data as it came in; `clean.*` tables hold parsed, app-ready data.
+- The table definitions live in the separate [sqitch_mars](https://github.com/marmargrobe/sqitch_mars) repo.
 
-1. Make sure you have Python 3 installed on your machine
-2. Clone the repo and then navigate inside the directory
-3. Install the python dependencies: `pip install -r requirements.txt`
-4. Open terminal/CMD in the directory and run the script in the following manner: `python insta-scrape.py -u "<instagram_username>" -p "<instagram password>" -c "<collection_id>" -o "<output csv file name with extension>"`
+### Setup
 
-> For example: `python insta-scrape.py -u "xyz" -p "abcd123456" -c "1234567890" -o "output.csv"`
+1. **Postgres (local).** Postgres 16 runs on this laptop. Create the database and tables:
+   ```
+   createdb mars
+   cd ../sqitch_mars && sqitch deploy db:pg:///mars
+   ```
+2. **`.env`** in the project root (not committed):
+   ```
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=mars
+   DB_USER=<your mac username>
+   DB_PASSWORD=
+   ```
+3. **Virtual environments**, one per part of the project:
+   | venv | For | Install |
+   |---|---|---|
+   | `.venv` | scrapers, imports | `pip install -r src/data_scraper/requirements.txt -r src/data_scraper_downloads/requirements.txt` |
+   | `.venv_data_cleaner` | cleaning, categorizing | `pip install -r src/data_cleaner/requirements.txt` |
+   | `.venv_data_maps` | the app | `pip install -r src/data_maps/requirements.txt` |
 
-5. If everything works fine, output csv file will be created
-__________________
+   Run scripts from the project root as modules, e.g. `python -m src.data_scraper.load_from_csv`.
 
-### What are collections and how do I know collections ID?
+4. **Old data.** `src/data_scraper/all_posts_2.csv` (1,000 posts with full details from the 2024
+   API scrape) can be reloaded with `python -m src.data_scraper.load_from_csv`.
 
-Whenever you save a post in Instagram using the 'save' button, you can go into the "Saved" section and view them. You can also group your saved posts by creating collections.
+### Importing a new Instagram export
 
-To get the collection ID, simply go to the collection you want (on desktop or mobile browser, not Instagram app) and the ID should be present in the URL, something like:
+1. Instagram → Accounts Center → Your information and permissions → Download your information.
+   Pick **Saved**, format **HTML**.
+2. Leave the downloaded `instagram-<account>-<date>-<id>.zip` in `~/Downloads` and run:
+   ```
+   python -m src.data_scraper_downloads.import_export
+   ```
+   Only the `saved/` folder is copied into `src/data_scraper_downloads/downloaded/` (gitignored);
+   a full account export also contains messages and login history. Posts already loaded are
+   skipped. `--dry-run` shows what would happen; `--profile <account>` re-imports an export
+   that was already copied.
 
-`https://www.instagram.com/<username>/saved/<collection_name>/<collection_id>/`
-_________________
+Both Instagram export layouts are supported: the 2024 one (links and save dates only) and the
+newer one (adds captions, hashtags and the post owner).
 
-### What data is saved?
-Currently, you will see following headers/columns/attributes in the saved csv file for each saved post:
+### Cleaning the data
 
-| Sl. no. | Parameter | Can be blank? | Description |
-| ------- | -------- | -------- | -------- | 
-| 1.  | **#**                   | no | serial number
-| 2.  | **link**                | no | link to instagram post, is generated in script
-| 3.  | **location_short_name** | yes | short name of location if present in post
-| 4.  | **facebook_places_id**  | yes | location id if location is present
-| 5.  | **location_name**       | yes | name of location
-| 6.  | **address**             | yes | address of location
-| 7.  | **city**                | yes | city of location
-| 8.  | **location_lng**        | yes | longitude of location
-| 9.  | **location_lat**        | yes | latitude of location
-| 10. | **location_map_link**   | yes | google map link created basis latitude and longitude if present
-| 11. | **lng**                 | yes | longitude of post (extra)
-| 12. | **lat**                 | yes | latitude of post (extra)
-| 13. | **map_link**            | yes | google map link created basis latitude and longitude if present
-| 14. | **full_name_op**        | no | name on Instagram of person who posted
-| 15. | **username_op**         | no | Instagram username of person who posted
-| 16. | **caption**             | yes | caption text if present
+```
+python -m src.data_cleaner.reels_scraped_transform      # rawstd.insta_saved_reels → clean tables
+python -m src.data_cleaner.reels_scraped_categorize --lookup_col caption_text --top_n 3
+```
 
-________________
+### The app
 
-### What if I want to fetch data of all my saved posts?
-This script is not created to cater to such requirement, however it is possible to do so. 
+```
+source .venv_data_maps/bin/activate
+streamlit run src/data_maps/app.py
+```
+Opens at http://localhost:8501 with a map, a searchable table and stats per Instagram export.
 
-1. Remove line `67` that takes collection ID is argument
-2. Remove line `173` which is the `if` condition to check only for collection ID
-3. Indent/format code if needed
+The app is growing into one tab per kind of saved post (Travel, Recipes, Watch/read, Workouts,
+Journal prompts, Hobbies & projects, Business). Which collections feed which tab, how each tab
+extracts its data, and the ideas backlog are in **[docs/app_plan.md](docs/app_plan.md)**.
 
-It should work, although I have not tested it.
-__________
+### Docker (old AWS setup)
 
-### :exclamation::exclamation: Credentials storage :exclamation::exclamation:
-If you use this script for the first time your Instagram authentication cookie will get saved in a file called `credentials.json`. Script will use it for logging again if needed - or generate a new one if cookie is expired. 
+The Dockerfiles and GitHub Actions workflows were used to run the categorizer on AWS (GPU)
+against an RDS database that no longer exists. They still reference the old
+`src.data_cleaner.data_categorization` module and need updating before they are used again.
 
-If you want to change the path of this file, change it on line `77`
+Build base image: `docker build -f Dockerfile.base -t data-cleaner .`
 
-> The credentials file has sensitive data which can be used to login to your instagram account. If you are using this script on a shared computer then permanently delete that file after using the script.
-_____________
+Build and run a categorizer image, e.g.:
+```
+docker build -f Dockerfile.city -t city_category .
+docker run --gpus all -it city_category
+```
+Other images: `Dockerfile.lng_lat`, `Dockerfile.location_list`, `Dockerfile.hashtags`,
+`Dockerfile.location_name`, `Dockerfile.usertags`.
 
 ### Credits
-This script heavily relies on https://github.com/dilame/instagram-private-api library for Instagram API functions like logging in, getting posts etc. Thanks to the developer(s)!
-
-
-## Docker
-
-`docker build -t data-category .`
-`docker images`
-
-`docker run -it <image id>`
-
-`   docker run --gpus all -it --rm your-image-name python your_script.py`
-
-
-Build base image:
-`docker build -f Dockerfile.base -t data-cleaner .`
-
-Build individual images:
-`docker build -f Dockerfile.city -t city_category .`
-`docker build -f Dockerfile.lng_lat -t lng_lat_category .`
-`docker build -f Dockerfile.location_list -t loc_list_category .`
-`docker build -f Dockerfile.hashtags -t hashtags_category .`
-`docker build -f Dockerfile.location_name -t location_name_category .`
-`docker build -f Dockerfile.usertags -t usertags_category .`
-
-Run individual images:
-`docker run --gpus all -it city_category`
-`docker run --gpus all -it lng_lat_category`
-`docker run --gpus all -it loc_list_category`
-`docker run --gpus all -it hashtags_category`
-`docker run --gpus all -it location_name_category`
-`docker run --gpus all -it usertags_category`
-
+Started from [skd1993/instagram-saved-scraper](https://github.com/skd1993/instagram-saved-scraper).
+The 2024 API scraper uses [instagrapi](https://github.com/subzeroid/instagrapi).

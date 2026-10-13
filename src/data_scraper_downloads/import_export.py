@@ -14,6 +14,7 @@ Options:
     --source PATH   a specific .zip/folder, or a folder to search (default: ~/Downloads)
     --dry-run       show what would be imported without touching anything
     --verbose       show every row the loaders insert
+    --profile NAME  re-import the newest export already copied for NAME
 """
 import argparse
 import contextlib
@@ -28,7 +29,7 @@ from sqlalchemy import text
 
 from src.helper.model import engine
 from src.data_scraper_downloads.utils import get_soup_from_file_path
-from src.data_scraper_downloads import scrape_saved_collections, scrape_saved_posts
+from src.data_scraper_downloads import parse_export_v2, scrape_saved_collections, scrape_saved_posts
 
 DOWNLOADED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloaded")
 EXPORT_NAME = re.compile(r"^instagram-(?P<profile>.+)-(?P<date>\d{4}-\d{2}-\d{2})-[^.]+$")
@@ -60,10 +61,14 @@ def _export_name(path):
 
 
 def copy_export(name, path):
-    """Copy or unzip an export into downloaded/<name>. Returns the destination folder."""
+    """Copy or unzip the saved-posts part of an export into downloaded/<name>.
+
+    A full account export also holds messages, login history and media, so only
+    your_instagram_activity/saved/ is copied.
+    """
     destination = os.path.join(DOWNLOADED_DIR, name)
     if os.path.isdir(path):
-        shutil.copytree(path, destination)
+        shutil.copytree(os.path.join(path, SAVED_DIR), os.path.join(destination, SAVED_DIR))
         return destination
 
     with zipfile.ZipFile(path) as archive:
@@ -72,6 +77,8 @@ def copy_export(name, path):
         prefix = f"{name}/" if all(m.startswith(f"{name}/") for m in members) else ""
         for member in members:
             relative = member[len(prefix):]
+            if not relative.startswith(SAVED_DIR + "/"):
+                continue
             target = os.path.realpath(os.path.join(destination, relative))
             if not target.startswith(os.path.realpath(destination) + os.sep):
                 continue  # skip anything that would land outside the destination
@@ -94,24 +101,34 @@ def saved_counts(profile):
             text("SELECT count(*) FROM rawstd.insta_download_saved_collections WHERE insta_account = :p"),
             {"p": profile},
         ).scalar()
-    return reels, collections, latest
+        captions = connection.execute(
+            text("SELECT count(*) FROM rawstd.insta_download_saved_reels_details WHERE insta_account = :p AND caption_text IS NOT NULL"),
+            {"p": profile},
+        ).scalar()
+    return reels, collections, latest, captions
 
 
 def import_profile(profile, verbose):
     before = saved_counts(profile)
-    for module, saved_target in LOADERS:
-        output = contextlib.nullcontext() if verbose else contextlib.redirect_stdout(io.StringIO())
-        with output:
-            soup = get_soup_from_file_path(target_profile=profile, saved_target=saved_target)
-            if soup:
-                module.process_collections_and_reels(soup=soup, target_profile=profile)
+    output = contextlib.nullcontext() if verbose else contextlib.redirect_stdout(io.StringIO())
+    with output:
+        soups = [get_soup_from_file_path(target_profile=profile, saved_target=target) for _, target in LOADERS]
+        if any(soup is not None and parse_export_v2.is_v2_layout(soup) for soup in soups):
+            # Newer layout: includes captions, hashtags and owners
+            parse_export_v2.load_export(posts_soup=soups[1], collections_soup=soups[0], target_profile=profile)
+        else:
+            for (module, _), soup in zip(LOADERS, soups):
+                if soup:
+                    module.process_collections_and_reels(soup=soup, target_profile=profile)
+    for (_, target), soup in zip(LOADERS, soups):
         if soup is None:
-            print(f"  {os.path.basename(saved_target)} not in this export, skipped")
+            print(f"  {os.path.basename(target)} not in this export, skipped")
     after = saved_counts(profile)
 
     print(f"  saved posts: {before[0]} -> {after[0]} (+{after[0] - before[0]})")
     print(f"  collections: {before[1]} -> {after[1]} (+{after[1] - before[1]})")
     print(f"  newest save: {before[2]} -> {after[2]}")
+    print(f"  captions:    {before[3]} -> {after[3]} (+{after[3] - before[3]})")
     if after[0] == before[0] and after[2] == before[2]:
         print("  nothing new; if you expected new saves, Instagram may have changed the export's HTML layout")
 
@@ -121,11 +138,17 @@ def main():
     parser.add_argument("--source", default=os.path.expanduser("~/Downloads"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--profile", help="re-import the newest export already in downloaded/ for this profile")
     args = parser.parse_args()
 
     if not args.verbose:
         # insert_record_with_conflict warns on every already-loaded row
         logging.getLogger("src.helper.utils_model").setLevel(logging.ERROR)
+
+    if args.profile:
+        print(f"Importing {args.profile}")
+        import_profile(args.profile, args.verbose)
+        return
 
     exports = find_exports(os.path.expanduser(args.source))
     new_exports = {n: p for n, p in exports.items() if not os.path.exists(os.path.join(DOWNLOADED_DIR, n))}
