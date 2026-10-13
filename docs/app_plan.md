@@ -90,7 +90,9 @@ A short "what is this" plus tags. To be refined later; the content is varied.
 1. ✅ `clean.saved_posts` (foundation) and `clean.collection_tabs`
 2. ✅ Recipes tab (v1): `python -m src.data_cleaner.recipes_extract` fills `clean.recipes`;
    pictures from `python -m src.data_scraper_downloads.fetch_thumbnails` (cached in `media/thumbnails/`)
-3. Travel tab
+3. ✅ Travel tab (v1): `python -m src.data_cleaner.travel_extract` fills `clean.travel_places`
+   (OpenStreetMap lookups cached in `clean.geocode_cache`); fixes made in the app are stored in
+   `clean.travel_place_choices` and survive re-extraction
 4. Watch / read tab
 5. Remaining tabs
 
@@ -104,7 +106,9 @@ Everything mentioned so far, to come back to:
   which currently takes ~10 min for 32 posts).
 - **Journal prompts:** custom prompt categories; label prompts by hand in the app.
 - **Watch / read:** "today I want to watch/read" picker by genre.
-- **Travel:** place type (café, restaurant, hike, monument, …); zoom-linked "places in view" frequency chart; trip lists (Mars & Ags is a shared trip list with a friend).
+- **Travel:** ✅ place types and zoom-linked charts (v1). Next: trip lists (Mars & Ags is a shared trip list
+  with a friend); posts that list places without 📍 ("5 cafés in Kyoto: 1. … 2. …"); "visited" checkmarks;
+  better types for places OpenStreetMap only knows as a city.
 - **Business:** own tab; collection expected to grow.
 - **Media analysis** for posts whose title/recipe/place is only in the video or image:
   Whisper (speech to text) and Tesseract/EasyOCR (on-screen text), run locally. Needs the
