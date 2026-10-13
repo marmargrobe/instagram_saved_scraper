@@ -88,7 +88,8 @@ A short "what is this" plus tags. To be refined later; the content is varied.
 
 ## Build order
 1. ✅ `clean.saved_posts` (foundation) and `clean.collection_tabs`
-2. ✅ Recipes tab (v1): `python -m src.data_cleaner.recipes_extract` fills `clean.recipes`
+2. ✅ Recipes tab (v1): `python -m src.data_cleaner.recipes_extract` fills `clean.recipes`;
+   pictures from `python -m src.data_scraper_downloads.fetch_thumbnails` (cached in `media/thumbnails/`)
 3. Travel tab
 4. Watch / read tab
 5. Remaining tabs
@@ -109,5 +110,9 @@ Everything mentioned so far, to come back to:
   Whisper (speech to text) and Tesseract/EasyOCR (on-screen text), run locally. Needs the
   media re-downloaded, since stored Instagram media links expire. Decide after seeing the
   `not_found` / `no_caption` counts.
+- **Removed posts:** the thumbnail fetcher detects posts removed from Instagram (`.removed` markers);
+  keep their saved caption/recipe, and maybe show a "removed" filter or count per tab.
+- **Thumbnails for media analysis:** run OCR on cached thumbnails to find movie titles or place
+  names shown in the cover image (cheaper than downloading videos).
 - **Auto-categorize** uncategorized saves into tabs, using the traits learned from each tab.
 - **Hosting:** the app could move online later (Streamlit Community Cloud + Neon/Supabase).
