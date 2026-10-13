@@ -6,6 +6,7 @@ Run from the project root (so .env is found):
     streamlit run src/data_maps/app.py
 """
 import os
+import random
 import sys
 
 # Streamlit puts this file's folder on sys.path, not the project root
@@ -245,6 +246,81 @@ def bar_chart(counts, label):
     st.altair_chart(chart, width="stretch")
 
 
+@st.cache_data(ttl=600)
+def load_watch_read():
+    """Titles found in Watch / read posts (with my watched/hidden choices), and posts with no title."""
+    titles = pd.read_sql(
+        text("""
+            SELECT w.*, p.url, p.owner_username, p.caption, p.collections,
+                   coalesce(w.imdb_id, 'book:' || coalesce(w.openlibrary_key, w.matched_title)) AS item_key,
+                   coalesce(c.watched, false) AS watched, coalesce(c.hidden, false) AS hidden
+            FROM clean.watch_read_titles w
+            JOIN clean.saved_posts p USING (code)
+            LEFT JOIN clean.watch_read_choices c
+                   ON c.item_key = coalesce(w.imdb_id, 'book:' || coalesce(w.openlibrary_key, w.matched_title))
+            ORDER BY w.is_primary DESC, w.votes DESC NULLS LAST
+        """),
+        engine,
+    )
+    titles = titles.astype(object).where(titles.notna(), None)
+    titles["genres"] = titles["genres"].apply(lambda g: g or [])
+    titles = titles.drop_duplicates("item_key")  # the same film saved twice shows once
+    no_title = pd.read_sql(
+        text("""
+            SELECT p.code, p.url, p.owner_username, p.caption, p.collections
+            FROM clean.saved_posts p
+            WHERE 'watch_read' = ANY (p.tabs)
+              AND NOT EXISTS (SELECT 1 FROM clean.watch_read_titles w WHERE w.code = p.code)
+        """),
+        engine,
+    )
+    no_title = no_title.astype(object).where(no_title.notna(), None)
+    return titles, no_title
+
+
+def save_watch_choice(item_key, watched, hidden):
+    with engine.begin() as connection:
+        connection.execute(
+            text("""
+                INSERT INTO clean.watch_read_choices (item_key, watched, hidden, updated_at)
+                VALUES (:key, :watched, :hidden, now())
+                ON CONFLICT (item_key) DO UPDATE SET watched = :watched, hidden = :hidden, updated_at = now()
+            """),
+            {"key": item_key, "watched": watched, "hidden": hidden},
+        )
+    load_watch_read.clear()
+
+
+def show_title(item, key_prefix=""):
+    with st.container(border=True):
+        picture = thumbnail(item.code)
+        if picture is not None:
+            st.image(picture, width="stretch")
+        year = f" ({item.year})" if item.year else ""
+        st.markdown(f"**{item.matched_title}{year}**" + (" ✅" if item.watched else ""))
+        details = [item.kind, ", ".join(item.genres)]
+        if item.rating:
+            details.append(f"⭐ {item.rating}")
+        if item.runtime_minutes:
+            details.append(f"{item.runtime_minutes} min")
+        if item.author:
+            details.append(f"by {item.author}")
+        st.caption(" · ".join(d for d in details if d))
+        links = [f"[Instagram post]({item.url})"]
+        if item.imdb_id:
+            links.append(f"[IMDb](https://www.imdb.com/title/{item.imdb_id}/)")
+        if item.openlibrary_key:
+            links.append(f"[Open Library](https://openlibrary.org{item.openlibrary_key})")
+        st.markdown(" · ".join(links))
+        left, right = st.columns(2)
+        if left.button("↩️ Not watched" if item.watched else "✅ Watched", key=f"{key_prefix}watched_{item.item_key}"):
+            save_watch_choice(item.item_key, not item.watched, item.hidden)
+            st.rerun()
+        if right.button("🙈 Not interested", key=f"{key_prefix}hide_{item.item_key}"):
+            save_watch_choice(item.item_key, item.watched, True)
+            st.rerun()
+
+
 def matches(post, query):
     haystack = " ".join(
         [post["caption_text"], post["username"] or "", post["location_name"] or "", post["city"] or ""]
@@ -281,7 +357,9 @@ if picked_tags:
 if only_located:
     filtered = filtered[filtered["lat"].notna()]
 
-recipes_tab, travel_tab, browse_tab, export_tab = st.tabs(["Recipes", "Travel", "Browse", "Instagram export"])
+recipes_tab, travel_tab, watch_tab, browse_tab, export_tab = st.tabs(
+    ["Recipes", "Travel", "Watch / read", "Browse", "Instagram export"]
+)
 
 with recipes_tab:
     recipes = load_recipes()
@@ -393,6 +471,42 @@ with travel_tab:
             for i, place in enumerate(cards.itertuples()):
                 with columns[i % 3]:
                     show_place(place, candidates[candidates["code"] == place.code])
+
+with watch_tab:
+    titles, no_title = load_watch_read()
+    available = titles[~titles["hidden"].astype(bool)]
+
+    st.subheader("Today I want to…")
+    pick = st.columns([1, 2, 1])
+    mode = pick[0].radio("Mode", ["Watch", "Read"], horizontal=True, label_visibility="collapsed")
+    kinds = {"Watch": {"movie", "series"}, "Read": {"book"}}[mode]
+    pool = available[available["kind"].isin(kinds) & ~available["watched"].astype(bool)]
+    genre_options = sorted({g for genres in pool["genres"] for g in genres})
+    genre = pick[1].selectbox("Genre", ["Any genre"] + genre_options, label_visibility="collapsed")
+    if genre != "Any genre":
+        pool = pool[pool["genres"].apply(lambda g: genre in g)]
+    if pick[2].button("🎲 Surprise me", disabled=pool.empty):
+        st.session_state["suggestion"] = random.choice(list(pool["item_key"]))
+    suggestion = pool[pool["item_key"] == st.session_state.get("suggestion")]
+    if not suggestion.empty:
+        with st.columns(3)[0]:
+            show_title(next(suggestion.itertuples()), key_prefix="pick_")
+    elif pool.empty:
+        st.caption("Nothing left to suggest here; everything is watched or hidden.")
+
+    st.divider()
+    show_watched = st.toggle("Show watched", value=True)
+    listed = available if show_watched else available[~available["watched"].astype(bool)]
+    st.write(f"{len(listed)} titles · {int(available['watched'].astype(bool).sum())} watched")
+    columns = st.columns(3)
+    for i, item in enumerate(listed.itertuples()):
+        with columns[i % 3]:
+            show_title(item)
+
+    with st.expander(f"No title found in {len(no_title)} posts (the title may only be in the video)"):
+        for post in no_title.itertuples():
+            caption = (post.caption or "no caption").strip().splitlines()[0][:100]
+            st.markdown(f"- [{post.owner_username or 'post'}]({post.url}) — {caption}")
 
 with browse_tab:
     st.write(f"{len(filtered):,} posts")

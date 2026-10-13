@@ -8,6 +8,7 @@ and organizes them, and shows them in a local Streamlit app.
   - [Setup](#setup)
   - [Importing a new Instagram export](#importing-a-new-instagram-export)
   - [Cleaning the data](#cleaning-the-data)
+  - [Reference data (IMDb)](#reference-data-imdb)
   - [Thumbnails](#thumbnails)
   - [The app](#the-app)
   - [Docker (old AWS setup)](#docker-old-aws-setup)
@@ -75,6 +76,16 @@ newer one (adds captions, hashtags and the post owner).
 ```
 python -m src.data_cleaner.reels_scraped_transform      # rawstd.insta_saved_reels → clean tables
 python -m src.data_cleaner.reels_scraped_categorize --lookup_col caption_text --top_n 3
+```
+
+### Reference data (IMDb)
+
+The Watch / read tab checks titles against IMDb's free non-commercial datasets
+(https://datasets.imdbws.com): movies, TV movies, series and mini-series with a rating (~540k titles).
+```
+python -m src.data_cleaner.imdb_load               # downloads to data/imdb/ (gitignored) if missing, then loads
+python -m src.data_cleaner.imdb_load --download    # refresh with the latest files (~230 MB)
+python -m src.data_cleaner.watch_read_extract      # find titles in Watch / read posts
 ```
 
 ### Thumbnails
