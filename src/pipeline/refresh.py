@@ -33,6 +33,11 @@ def _imdb():
     return imdb_load.run(max_age_days=30)
 
 
+def _exercises():
+    from src.data_cleaner import exercises_load
+    return exercises_load.run(max_age_days=90)
+
+
 def _recipes():
     from src.data_cleaner import recipes_extract
     return recipes_extract.run(new_only=True)
@@ -68,6 +73,7 @@ def _thumbnails():
 STEPS = [
     ("import", _import),
     ("imdb", _imdb),
+    ("exercises", _exercises),
     ("recipes", _recipes),
     ("travel", _travel),
     ("watch_read", _watch_read),

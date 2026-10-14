@@ -113,6 +113,7 @@ Everything goes stale at different speeds, so one runner keeps it current:
 | Import new Instagram export | zip in ~/Downloads | a new zip is there |
 | Recipes / Travel / Watch-read extraction | import | there are new posts (new posts only) |
 | IMDb reference data | — | older than 30 days |
+| Exercise database (free-exercise-db) | — | older than 90 days |
 | Thumbnails | import | posts without a picture |
 
 - `python -m src.pipeline.refresh` (or `--only travel`); each step skips itself when there is nothing new
@@ -127,10 +128,12 @@ Everything goes stale at different speeds, so one runner keeps it current:
 ## Ideas backlog
 Everything mentioned so far, to come back to:
 
-- **Workouts:** ✅ clickable body map (front/back, 15 muscles from wger.de drawings, shaded by number of saved
-  workouts; `python -m src.data_maps.build_muscle_map` rebuilds the assets). Next: extract specific muscles
-  (biceps vs triceps, quads vs hamstrings) instead of broad body areas; exercises from wger's database for a
-  selected muscle as suggestions.
+- **Workouts:** ✅ clickable body map (wger anatomy drawings, 15 muscles, shaded by number of saved workouts;
+  neck, face, forearms, lower back, inner/outer thighs, hips and full body as buttons next to it — a
+  react-body-highlighter version with all of them on the body was tried and dropped for looks) and
+  ✅ "💪 Load more exercises" from free-exercise-db (876 exercises, photos, instructions; level / equipment /
+  type filters). Next: extract specific muscles from captions (inner thighs, lower back, rear delts) instead of
+  broad body areas; save exercises to a "my routine" list.
 - **Recipes:** calorie estimate per recipe (ingredient parsing + USDA FoodData Central); edit a recipe in the
   app (fix name/labels/status; sets `user_edited` so re-extraction keeps the edit); split "what I eat in a day"
   posts into several recipes; speed up labeling (Mac GPU via `device="mps"`, or a smaller zero-shot model,
