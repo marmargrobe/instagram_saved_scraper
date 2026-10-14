@@ -330,11 +330,21 @@ def show_title(item, key_prefix=""):
 
 
 BODY_AREA_ORDER = ["neck", "shoulders", "back", "chest", "arms", "core", "glutes", "hips", "legs", "face", "full body"]
-OFF_MAP_AREAS = ["full body"]  # body areas the muscle map can't show
+# Areas the body drawing can't show -> (body areas in clean.workouts, muscles in reference.exercises)
+OFF_MAP = {
+    "neck": (["neck"], ["neck"]),
+    "face": (["face"], []),
+    "forearms": (["arms"], ["forearms"]),
+    "lower back": (["back"], ["lower back"]),
+    "inner thighs": (["legs", "hips"], ["adductors"]),
+    "outer thighs": (["legs", "hips"], ["abductors"]),
+    "hips": (["hips"], ["adductors", "abductors"]),
+    "full body": (["full body"], []),
+}
 EXERCISE_IMAGE_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/"
 EXERCISES_PER_PAGE = 12
 
-# Clickable body map (assets built by src/data_maps/build_muscle_map.py from react-body-highlighter, MIT)
+# Clickable body map (assets built by src/data_maps/build_muscle_map.py from wger.de drawings, AGPL-3.0)
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 with open(os.path.join(ASSETS_DIR, "muscle_map.json")) as _file:
     MUSCLES = json.load(_file)  # muscle id -> {"label", "areas" (post body areas), "exercise_muscles"}
@@ -347,12 +357,11 @@ with open(os.path.join(ASSETS_DIR, "muscle_map_front.svg"), encoding="utf-8") as
 BODY_MAP_CSS = """
 .bodymap { display: flex; gap: 12px; justify-content: center; }
 .bodymap figure { margin: 0; text-align: center; }
-.bodymap svg { height: 360px; width: auto; }
+.bodymap svg { height: 340px; width: auto; }
 .bodymap figcaption { font: 12px sans-serif; color: #888; }
-.muscle polygon { fill: var(--shade, #eadbd6); cursor: pointer; transition: fill 0.15s; }
-.muscle:hover polygon { fill: #f4a261; }
-.muscle.selected polygon { fill: #e4572e; }
-.part polygon { fill: #b6bdc3; }
+.muscle path { fill: var(--shade, #eadbd6); opacity: 0.9 !important; cursor: pointer; transition: fill 0.15s; }
+.muscle:hover path { fill: #f4a261; }
+.muscle.selected path { fill: #e4572e; }
 """
 BODY_MAP_JS = """
 function shade(count, max) {
@@ -454,12 +463,12 @@ def show_exercise(exercise):
             st.markdown("\n".join(f"{i}. {step}" for i, step in enumerate(exercise.instructions, 1)))
 
 
-def more_exercises(muscles):
-    """'Load more exercises' for the selected body-map muscles (free-exercise-db, public domain)."""
-    exercise_muscles = sorted({m for muscle in muscles for m in MUSCLES[muscle]["exercise_muscles"]})
+def more_exercises(selection, exercise_muscles):
+    """'Load more exercises' for the selected muscles and areas (free-exercise-db, public domain)."""
+    exercise_muscles = sorted(set(exercise_muscles))
     if not exercise_muscles:
         return
-    selection = ",".join(sorted(muscles))
+    selection = ",".join(sorted(selection))
     if st.session_state.get("exercises_for") != selection:  # new selection: start collapsed again
         st.session_state["exercises_for"] = selection
         st.session_state["exercise_count"] = 0
@@ -921,12 +930,13 @@ with workouts_tab:
         if muscles:
             st.markdown("**Selected:** " + ", ".join(MUSCLES[m]["label"] for m in muscles))
         extra_areas = st.pills(
-            "Also", OFF_MAP_AREAS, selection_mode="multi",
-            format_func=lambda a: f"{a} ({sum(a in b for b in workouts['body_areas'])})",
-        )
-        st.caption("Darker muscles have more saved workouts. Body map: "
-                   "[react-body-highlighter](https://github.com/giavinh79/react-body-highlighter) (MIT).")
-    areas = sorted({a for m in muscles for a in MUSCLES[m]["areas"]} | set(extra_areas or []))
+            "Also", list(OFF_MAP), selection_mode="multi",
+            format_func=lambda a: f"{a} ({sum(bool(set(OFF_MAP[a][0]) & set(b)) for b in workouts['body_areas'])})",
+        ) or []
+        st.caption("Darker muscles have more saved workouts. Body drawings: [wger](https://wger.de) (AGPL-3.0).")
+    areas = sorted({a for m in muscles for a in MUSCLES[m]["areas"]} | {a for e in extra_areas for a in OFF_MAP[e][0]})
+    exercise_muscles = [x for m in muscles for x in MUSCLES[m]["exercise_muscles"]] + \
+                       [x for e in extra_areas for x in OFF_MAP[e][1]]
     filters = st.columns([2, 2, 1])
     workout_query = filters[0].text_input("Search workouts", placeholder="exercise, @user, word in caption")
     workout_types = filters[1].multiselect("Type", sorted(workouts["workout_type"].dropna().unique()))
@@ -954,9 +964,9 @@ with workouts_tab:
         with columns[i % 3]:
             show_workout(workout)
 
-    if muscles:
+    if muscles or extra_areas:
         st.divider()
-        more_exercises(muscles)
+        more_exercises(muscles + extra_areas, exercise_muscles)
 
 with journal_tab:
     prompts = load_prompts()

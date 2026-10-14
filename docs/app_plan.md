@@ -128,8 +128,9 @@ Everything goes stale at different speeds, so one runner keeps it current:
 ## Ideas backlog
 Everything mentioned so far, to come back to:
 
-- **Workouts:** ✅ clickable body map (react-body-highlighter shapes, MIT: 20 muscles incl. neck, face,
-  forearms, lower back, front/rear shoulders, inner/outer thighs; shaded by number of saved workouts) and
+- **Workouts:** ✅ clickable body map (wger anatomy drawings, 15 muscles, shaded by number of saved workouts;
+  neck, face, forearms, lower back, inner/outer thighs, hips and full body as buttons next to it — a
+  react-body-highlighter version with all of them on the body was tried and dropped for looks) and
   ✅ "💪 Load more exercises" from free-exercise-db (876 exercises, photos, instructions; level / equipment /
   type filters). Next: extract specific muscles from captions (inner thighs, lower back, rear delts) instead of
   broad body areas; save exercises to a "my routine" list.
