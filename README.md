@@ -103,7 +103,7 @@ marker. Already-fetched posts are skipped, so run it again after each import.
 
 One command runs every step in order; each step skips itself when there is nothing new:
 ```
-.venv_data_cleaner/bin/python -m src.pipeline.refresh                 # import → imdb → recipes → travel → watch_read → workouts → journal → thumbnails
+.venv_data_cleaner/bin/python -m src.pipeline.refresh                 # import → imdb → exercises → recipes → travel → watch_read → workouts → journal → thumbnails
 .venv_data_cleaner/bin/python -m src.pipeline.refresh --only travel   # one or more steps
 ```
 - Each step is logged in `ops.pipeline_runs`; a failed step is logged and the rest still run; only one refresh runs at a time.
@@ -118,8 +118,11 @@ One command runs every step in order; each step skips itself when there is nothi
 source .venv_data_maps/bin/activate
 streamlit run src/data_maps/app.py
 ```
-The Workouts tab's clickable body map uses drawings from [wger](https://wger.de) (AGPL-3.0), merged into
+The Workouts tab's clickable body map uses muscle shapes from
+[react-body-highlighter](https://github.com/giavinh79/react-body-highlighter) (MIT), turned into
 `src/data_maps/assets/` by `python -m src.data_maps.build_muscle_map` (only needed to rebuild them).
+"💪 Load more exercises" shows exercises from [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
+(public domain), loaded into `reference.exercises` by `python -m src.data_cleaner.exercises_load`.
 
 Opens at http://localhost:8501 with a map, a searchable table and stats per Instagram export.
 

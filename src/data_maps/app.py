@@ -330,12 +330,14 @@ def show_title(item, key_prefix=""):
 
 
 BODY_AREA_ORDER = ["neck", "shoulders", "back", "chest", "arms", "core", "glutes", "hips", "legs", "face", "full body"]
-OFF_MAP_AREAS = ["neck", "hips", "face", "full body"]  # body areas the muscle map can't show (neck also via trapezius)
+OFF_MAP_AREAS = ["full body"]  # body areas the muscle map can't show
+EXERCISE_IMAGE_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5/exercises/"
+EXERCISES_PER_PAGE = 12
 
-# Clickable body map (assets built by src/data_maps/build_muscle_map.py from wger.de drawings, AGPL-3.0)
+# Clickable body map (assets built by src/data_maps/build_muscle_map.py from react-body-highlighter, MIT)
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 with open(os.path.join(ASSETS_DIR, "muscle_map.json")) as _file:
-    MUSCLES = json.load(_file)  # muscle id -> {"label": ..., "areas": [...]}
+    MUSCLES = json.load(_file)  # muscle id -> {"label", "areas" (post body areas), "exercise_muscles"}
 with open(os.path.join(ASSETS_DIR, "muscle_map_front.svg"), encoding="utf-8") as _front, \
         open(os.path.join(ASSETS_DIR, "muscle_map_back.svg"), encoding="utf-8") as _back:
     BODY_MAP_HTML = (
@@ -345,11 +347,12 @@ with open(os.path.join(ASSETS_DIR, "muscle_map_front.svg"), encoding="utf-8") as
 BODY_MAP_CSS = """
 .bodymap { display: flex; gap: 12px; justify-content: center; }
 .bodymap figure { margin: 0; text-align: center; }
-.bodymap svg { height: 340px; width: auto; }
+.bodymap svg { height: 360px; width: auto; }
 .bodymap figcaption { font: 12px sans-serif; color: #888; }
-.muscle path { fill: var(--shade, #eadbd6); opacity: 0.9 !important; cursor: pointer; transition: fill 0.15s; }
-.muscle:hover path { fill: #f4a261; }
-.muscle.selected path { fill: #e4572e; }
+.muscle polygon { fill: var(--shade, #eadbd6); cursor: pointer; transition: fill 0.15s; }
+.muscle:hover polygon { fill: #f4a261; }
+.muscle.selected polygon { fill: #e4572e; }
+.part polygon { fill: #b6bdc3; }
 """
 BODY_MAP_JS = """
 function shade(count, max) {
@@ -391,7 +394,7 @@ def body_map(workouts, key="body_map"):
     data = {"counts": counts, "max": max(counts.values()), "selected": selected,
             "labels": {m: info["label"] for m, info in MUSCLES.items()}}
     result = body_map_component(data=data, default={"selected": []}, key=key, on_selected_change=lambda: None)
-    return sorted(result.selected or [])
+    return sorted(getattr(result, "selected", None) or [])
 WORKOUT_STATUS = {
     "exercises": "Exercise list",
     "routine": "Routine / tip",
@@ -416,6 +419,79 @@ def load_workouts():
     for column in ("body_areas", "exercises", "equipment", "collections"):
         workouts[column] = workouts[column].apply(lambda values: values or [])
     return workouts
+
+
+@st.cache_data(ttl=3600)
+def load_exercises(exercise_muscles):
+    """Exercises from reference.exercises whose primary muscles overlap the given ones, easiest first."""
+    exercises = pd.read_sql(
+        text("""
+            SELECT id, name, level, category, equipment, force, mechanic,
+                   primary_muscles, secondary_muscles, instructions, images
+            FROM reference.exercises
+            WHERE primary_muscles && CAST(:muscles AS TEXT[])
+            ORDER BY array_position(ARRAY['beginner', 'intermediate', 'expert'], level), name
+        """),
+        engine,
+        params={"muscles": list(exercise_muscles)},
+    )
+    return exercises.astype(object).where(exercises.notna(), None)
+
+
+def show_exercise(exercise):
+    with st.container(border=True):
+        if exercise.images:
+            st.image(EXERCISE_IMAGE_BASE + exercise.images[0], width="stretch")  # start position
+        st.markdown(f"**{exercise.name}**")
+        st.caption(" · ".join(x for x in (exercise.level, exercise.equipment, exercise.category) if x))
+        muscles = ", ".join(exercise.primary_muscles)
+        if exercise.secondary_muscles:
+            muscles += f" (also {', '.join(exercise.secondary_muscles)})"
+        st.caption(f"Muscles: {muscles}")
+        with st.expander("How to do it"):
+            if len(exercise.images) > 1:
+                st.image(EXERCISE_IMAGE_BASE + exercise.images[1], caption="End position", width="stretch")
+            st.markdown("\n".join(f"{i}. {step}" for i, step in enumerate(exercise.instructions, 1)))
+
+
+def more_exercises(muscles):
+    """'Load more exercises' for the selected body-map muscles (free-exercise-db, public domain)."""
+    exercise_muscles = sorted({m for muscle in muscles for m in MUSCLES[muscle]["exercise_muscles"]})
+    if not exercise_muscles:
+        return
+    selection = ",".join(sorted(muscles))
+    if st.session_state.get("exercises_for") != selection:  # new selection: start collapsed again
+        st.session_state["exercises_for"] = selection
+        st.session_state["exercise_count"] = 0
+    if st.session_state["exercise_count"] == 0:
+        if st.button("💪 Load more exercises", type="primary"):
+            st.session_state["exercise_count"] = EXERCISES_PER_PAGE
+            st.rerun()
+        return
+
+    st.subheader("More exercises")
+    st.caption(f"From the free exercise database for: {', '.join(exercise_muscles)}")
+    exercises = load_exercises(tuple(exercise_muscles))
+    filters = st.columns(3)
+    levels = filters[0].multiselect("Level", ["beginner", "intermediate", "expert"])
+    equipment = filters[1].multiselect("Equipment", sorted(exercises["equipment"].dropna().unique()))
+    categories = filters[2].multiselect("Type", sorted(exercises["category"].dropna().unique()))
+    if levels:
+        exercises = exercises[exercises["level"].isin(levels)]
+    if equipment:
+        exercises = exercises[exercises["equipment"].isin(equipment)]
+    if categories:
+        exercises = exercises[exercises["category"].isin(categories)]
+
+    count = st.session_state["exercise_count"]
+    st.write(f"Showing {min(count, len(exercises))} of {len(exercises)} exercises")
+    columns = st.columns(3)
+    for i, exercise in enumerate(exercises.head(count).itertuples()):
+        with columns[i % 3]:
+            show_exercise(exercise)
+    if count < len(exercises) and st.button("Load more"):
+        st.session_state["exercise_count"] = count + EXERCISES_PER_PAGE
+        st.rerun()
 
 
 def show_workout(workout):
@@ -848,7 +924,8 @@ with workouts_tab:
             "Also", OFF_MAP_AREAS, selection_mode="multi",
             format_func=lambda a: f"{a} ({sum(a in b for b in workouts['body_areas'])})",
         )
-        st.caption("Darker muscles have more saved workouts. Body drawings: [wger](https://wger.de) (AGPL-3.0).")
+        st.caption("Darker muscles have more saved workouts. Body map: "
+                   "[react-body-highlighter](https://github.com/giavinh79/react-body-highlighter) (MIT).")
     areas = sorted({a for m in muscles for a in MUSCLES[m]["areas"]} | set(extra_areas or []))
     filters = st.columns([2, 2, 1])
     workout_query = filters[0].text_input("Search workouts", placeholder="exercise, @user, word in caption")
@@ -870,11 +947,16 @@ with workouts_tab:
         )]
 
     unclear = workouts["status"].isin(["no_details", "no_caption"]).sum()
+    st.subheader("From your Instagram saves")
     st.write(f"{len(shown)} of {len(workouts)} posts" + ("" if show_unclear else f" · {unclear} without details hidden"))
     columns = st.columns(3)
     for i, workout in enumerate(shown.itertuples()):
         with columns[i % 3]:
             show_workout(workout)
+
+    if muscles:
+        st.divider()
+        more_exercises(muscles)
 
 with journal_tab:
     prompts = load_prompts()
