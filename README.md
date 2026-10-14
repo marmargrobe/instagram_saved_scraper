@@ -118,6 +118,9 @@ One command runs every step in order; each step skips itself when there is nothi
 source .venv_data_maps/bin/activate
 streamlit run src/data_maps/app.py
 ```
+The Workouts tab's clickable body map uses drawings from [wger](https://wger.de) (AGPL-3.0), merged into
+`src/data_maps/assets/` by `python -m src.data_maps.build_muscle_map` (only needed to rebuild them).
+
 Opens at http://localhost:8501 with a map, a searchable table and stats per Instagram export.
 
 The app is growing into one tab per kind of saved post (Travel, Recipes, Watch/read, Workouts,
