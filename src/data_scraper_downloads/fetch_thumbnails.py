@@ -7,10 +7,10 @@ Save a thumbnail for each saved post so the app can show pictures offline.
 
 Opens each post's public embed page (instagram.com/p/<code>/embed/, the page websites use to
 embed posts; no login) in headless Chrome, reads the cover image and saves it as
-media/thumbnails/<code>.jpg. Posts that already have a thumbnail are skipped, so it can be
+DATA_DIR/derived/thumbnails/<code>.jpg. Posts that already have a thumbnail are skipped, so it can be
 re-run after each import. Instagram's image links expire, which is why the file is saved.
 
-Posts whose embed page says "may have been removed" get an empty media/thumbnails/<code>.removed
+Posts whose embed page says "may have been removed" get an empty thumbnails/<code>.removed
 marker so they are not retried (use --retry-removed to try them again). Instagram shows that
 page both for deleted posts and for posts whose owner turned off embedding.
 """
@@ -28,10 +28,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from sqlalchemy import text
 
+from src.helper import paths
 from src.helper.model import engine
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-THUMBNAIL_DIR = os.path.join(PROJECT_ROOT, "media", "thumbnails")
+THUMBNAIL_DIR = str(paths.THUMBNAILS)  # DATA_DIR/derived/thumbnails (see src/helper/paths.py)
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36"
 
 
@@ -88,7 +88,7 @@ def run(tab="any", limit=0, retry_removed=False):
     if not posts:
         return "every post already has a thumbnail"
     os.makedirs(THUMBNAIL_DIR, exist_ok=True)
-    print(f"Fetching {len(posts)} thumbnails into {os.path.relpath(THUMBNAIL_DIR, PROJECT_ROOT)}/")
+    print(f"Fetching {len(posts)} thumbnails into {THUMBNAIL_DIR}/")
 
     saved, missing, removed = 0, [], []
     driver = headless_chrome()

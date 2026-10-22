@@ -7,7 +7,8 @@ Import a new Instagram "Download your information" export into the rawstd downlo
        python -m src.data_scraper_downloads.import_export
 
 The script looks in ~/Downloads for instagram-<profile>-<date>-<id>.zip (or the folder
-Safari unzips it to), copies it into src/data_scraper_downloads/downloaded/, and loads the
+Safari unzips it to), copies its saved/ folder into DATA_DIR/raw/instagram/exports/<account>/
+(with a manifest.json listing every file and its checksum), and loads the
 newest export for each profile. Posts already in the database are skipped, so re-running is safe.
 
 Options:
@@ -18,20 +19,23 @@ Options:
 """
 import argparse
 import contextlib
+import hashlib
 import io
+import json
 import logging
 import os
 import re
 import shutil
 import zipfile
+from datetime import datetime
 
 from sqlalchemy import text
 
+from src.helper import paths
 from src.helper.model import engine
 from src.data_scraper_downloads.utils import get_soup_from_file_path
 from src.data_scraper_downloads import parse_export_v2, scrape_saved_collections, scrape_saved_posts
 
-DOWNLOADED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downloaded")
 EXPORT_NAME = re.compile(r"^instagram-(?P<profile>.+)-(?P<date>\d{4}-\d{2}-\d{2})-[^.]+$")
 SAVED_DIR = os.path.join("your_instagram_activity", "saved")
 LOADERS = [
@@ -60,15 +64,38 @@ def _export_name(path):
     return name[:-4] if name.endswith(".zip") else name
 
 
+def export_dir(name):
+    """DATA_DIR/raw/instagram/exports/<account>/<export folder name>"""
+    return str(paths.INSTAGRAM_EXPORTS / EXPORT_NAME.match(name)["profile"] / name)
+
+
+def write_manifest(destination, source):
+    """manifest.json next to the export: where it came from, when, and a checksum of every file."""
+    files = []
+    for root, _, names in os.walk(destination):
+        for file_name in sorted(names):
+            if file_name == "manifest.json":
+                continue
+            full = os.path.join(root, file_name)
+            with open(full, "rb") as file:
+                digest = hashlib.sha256(file.read()).hexdigest()
+            files.append({"path": os.path.relpath(full, destination), "bytes": os.path.getsize(full), "sha256": digest})
+    manifest = {"source": os.path.basename(source), "imported_at": datetime.now().isoformat(timespec="seconds"),
+                "files": files}
+    with open(os.path.join(destination, "manifest.json"), "w") as file:
+        json.dump(manifest, file, indent=2)
+
+
 def copy_export(name, path):
-    """Copy or unzip the saved-posts part of an export into downloaded/<name>.
+    """Copy or unzip the saved-posts part of an export into DATA_DIR/raw/instagram/exports/<account>/<name>.
 
     A full account export also holds messages, login history and media, so only
     your_instagram_activity/saved/ is copied.
     """
-    destination = os.path.join(DOWNLOADED_DIR, name)
+    destination = export_dir(name)
     if os.path.isdir(path):
         shutil.copytree(os.path.join(path, SAVED_DIR), os.path.join(destination, SAVED_DIR))
+        write_manifest(destination, path)
         return destination
 
     with zipfile.ZipFile(path) as archive:
@@ -88,6 +115,7 @@ def copy_export(name, path):
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with archive.open(member) as src, open(target, "wb") as dst:
                 shutil.copyfileobj(src, dst)
+    write_manifest(destination, path)
     return destination
 
 
@@ -140,7 +168,7 @@ def run(source="~/Downloads"):
     """Copy and import new exports found in source; returns a one-line summary."""
     logging.getLogger("src.helper.utils_model").setLevel(logging.ERROR)
     exports = find_exports(os.path.expanduser(source))
-    new_exports = {n: p for n, p in exports.items() if not os.path.exists(os.path.join(DOWNLOADED_DIR, n))}
+    new_exports = {n: p for n, p in exports.items() if not os.path.exists(export_dir(n))}
     if not new_exports:
         return f"no new Instagram exports in {source}"
     profiles = set()
@@ -155,7 +183,7 @@ def main():
     parser.add_argument("--source", default=os.path.expanduser("~/Downloads"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose", action="store_true")
-    parser.add_argument("--profile", help="re-import the newest export already in downloaded/ for this profile")
+    parser.add_argument("--profile", help="re-import the newest export already in the data folder for this profile")
     args = parser.parse_args()
 
     if not args.verbose:
@@ -168,7 +196,7 @@ def main():
         return
 
     exports = find_exports(os.path.expanduser(args.source))
-    new_exports = {n: p for n, p in exports.items() if not os.path.exists(os.path.join(DOWNLOADED_DIR, n))}
+    new_exports = {n: p for n, p in exports.items() if not os.path.exists(export_dir(n))}
     if not new_exports:
         print(f"No new Instagram exports found in {args.source}")
         if exports:
@@ -182,7 +210,7 @@ def main():
         if args.dry_run:
             print(f"Would import {path} ({profile})")
             continue
-        print(f"Copying {os.path.basename(path)} -> downloaded/{name}")
+        print(f"Copying {os.path.basename(path)} -> {export_dir(name)}")
         copy_export(name, path)
 
     if args.dry_run:

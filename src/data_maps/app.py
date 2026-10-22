@@ -23,13 +23,14 @@ from folium.plugins import MarkerCluster
 from sqlalchemy import text
 from streamlit_folium import st_folium
 
+from src.helper import paths
 from src.helper.model import engine
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-THUMBNAIL_DIR = os.path.join(PROJECT_ROOT, "media", "thumbnails")
+THUMBNAIL_DIR = str(paths.THUMBNAILS)  # data lives outside the repo (src/helper/paths.py)
 # The refresh needs the libraries in the cleaner venv (spaCy, transformers, selenium, ...)
 CLEANER_PYTHON = os.path.join(PROJECT_ROOT, ".venv_data_cleaner", "bin", "python")
-REFRESH_LOG = os.path.join(PROJECT_ROOT, "logs", "refresh.log")
+REFRESH_LOG = str(paths.LOGS / "refresh.log")
 DOWNLOAD_YOUR_INFORMATION = "https://accountscenter.instagram.com/info_and_permissions/dyi/"
 STEP_ICONS = {"running": "⏳", "done": "✅", "skipped": "⏭️", "failed": "❌"}
 POST_CODE = r"instagram\.com/(?:reel|p|tv)/([^/?#]+)"

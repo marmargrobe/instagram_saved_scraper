@@ -1,0 +1,139 @@
+{
+  "shoulders": {
+    "label": "Shoulders",
+    "areas": [
+      "shoulders"
+    ],
+    "exercise_muscles": [
+      "shoulders"
+    ]
+  },
+  "chest": {
+    "label": "Chest",
+    "areas": [
+      "chest"
+    ],
+    "exercise_muscles": [
+      "chest"
+    ]
+  },
+  "serratus": {
+    "label": "Serratus",
+    "areas": [
+      "chest"
+    ],
+    "exercise_muscles": [
+      "chest"
+    ]
+  },
+  "biceps": {
+    "label": "Biceps",
+    "areas": [
+      "arms"
+    ],
+    "exercise_muscles": [
+      "biceps"
+    ]
+  },
+  "brachialis": {
+    "label": "Brachialis",
+    "areas": [
+      "arms"
+    ],
+    "exercise_muscles": [
+      "biceps"
+    ]
+  },
+  "triceps": {
+    "label": "Triceps",
+    "areas": [
+      "arms"
+    ],
+    "exercise_muscles": [
+      "triceps"
+    ]
+  },
+  "abs": {
+    "label": "Abs",
+    "areas": [
+      "core"
+    ],
+    "exercise_muscles": [
+      "abdominals"
+    ]
+  },
+  "obliques": {
+    "label": "Obliques",
+    "areas": [
+      "core"
+    ],
+    "exercise_muscles": [
+      "abdominals"
+    ]
+  },
+  "lats": {
+    "label": "Lats",
+    "areas": [
+      "back"
+    ],
+    "exercise_muscles": [
+      "lats",
+      "middle back"
+    ]
+  },
+  "trapezius": {
+    "label": "Trapezius",
+    "areas": [
+      "neck",
+      "back"
+    ],
+    "exercise_muscles": [
+      "traps"
+    ]
+  },
+  "glutes": {
+    "label": "Glutes",
+    "areas": [
+      "glutes"
+    ],
+    "exercise_muscles": [
+      "glutes"
+    ]
+  },
+  "quads": {
+    "label": "Quads",
+    "areas": [
+      "legs"
+    ],
+    "exercise_muscles": [
+      "quadriceps"
+    ]
+  },
+  "hamstrings": {
+    "label": "Hamstrings",
+    "areas": [
+      "legs"
+    ],
+    "exercise_muscles": [
+      "hamstrings"
+    ]
+  },
+  "calves": {
+    "label": "Calves",
+    "areas": [
+      "legs"
+    ],
+    "exercise_muscles": [
+      "calves"
+    ]
+  },
+  "soleus": {
+    "label": "Soleus",
+    "areas": [
+      "legs"
+    ],
+    "exercise_muscles": [
+      "calves"
+    ]
+  }
+}

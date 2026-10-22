@@ -6,6 +6,7 @@ and organizes them, and shows them in a local Streamlit app.
 
   - [How it works](#how-it-works)
   - [Setup](#setup)
+  - [Where data lives](#where-data-lives)
   - [Importing a new Instagram export](#importing-a-new-instagram-export)
   - [Cleaning the data](#cleaning-the-data)
   - [Reference data (IMDb)](#reference-data-imdb)
@@ -36,14 +37,8 @@ Instagram ──► src/data_scraper/            (2024: API scrape with instagra
    createdb mars
    cd ../sqitch_mars && sqitch deploy db:pg:///mars
    ```
-2. **`.env`** in the project root (not committed):
-   ```
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=mars
-   DB_USER=<your mac username>
-   DB_PASSWORD=
-   ```
+2. **`.env`** in the project root (never committed): `cp .env.example .env` and fill it in.
+   It holds the database settings and `DATA_DIR`, the folder where all data lives (below).
 3. **Virtual environments**, one per part of the project:
    | venv | For | Install |
    |---|---|---|
@@ -53,8 +48,36 @@ Instagram ──► src/data_scraper/            (2024: API scrape with instagra
 
    Run scripts from the project root as modules, e.g. `python -m src.data_scraper.load_from_csv`.
 
-4. **Old data.** `src/data_scraper/all_posts_2.csv` (1,000 posts with full details from the 2024
-   API scrape) can be reloaded with `python -m src.data_scraper.load_from_csv`.
+4. **Commit checks** (once): `.venv/bin/pre-commit install`. Every `git commit` then runs
+   detect-secrets (blocks passwords, API keys, tokens) and blocks files over 1 MB.
+
+5. **Old data.** The 2024 API scrape CSVs (1,000 posts with full details) in
+   `DATA_DIR/raw/instagram/csv_backups_2024/` can be reloaded with `python -m src.data_scraper.load_from_csv`.
+
+### Where data lives
+
+Data never lives in this repo. Everything is under `DATA_DIR` (default `~/Data/saved-instagram`,
+readable only by your user), laid out in `src/helper/paths.py`:
+
+```
+~/Data/saved-instagram/
+  raw/                                    as received, never edited
+    instagram/exports/<account>/<export>/   saved/ folder of each Instagram export + manifest.json
+    instagram/csv_backups_2024/             CSVs from the 2024 API scrape
+    reference/imdb/                         IMDb datasets
+    reference/free-exercise-db/             exercise database
+  derived/thumbnails/                     post cover images (can be re-fetched)
+  config/proxies/                         proxy lists for the old link scraper
+  backups/postgres/                       database backups (scripts/backup_database.sh)
+  logs/                                   refresh pipeline log
+  archive/                                kept for reference (e.g. files removed from git history)
+```
+
+Each import writes a `manifest.json` next to the export (source zip, import time, size and sha256 of
+every file), so every row can be traced back to the file it came from.
+
+**Backups:** `scripts/backup_database.sh` saves a dated `pg_dump` (everything except the
+re-downloadable `reference` schema, so it includes your journal entries) and keeps the newest 8.
 
 ### Importing a new Instagram export
 
@@ -64,7 +87,7 @@ Instagram ──► src/data_scraper/            (2024: API scrape with instagra
    ```
    python -m src.data_scraper_downloads.import_export
    ```
-   Only the `saved/` folder is copied into `src/data_scraper_downloads/downloaded/` (gitignored);
+   Only the `saved/` folder is copied, into `DATA_DIR/raw/instagram/exports/<account>/`;
    a full account export also contains messages and login history. Posts already loaded are
    skipped. `--dry-run` shows what would happen; `--profile <account>` re-imports an export
    that was already copied.
@@ -84,7 +107,7 @@ python -m src.data_cleaner.reels_scraped_categorize --lookup_col caption_text --
 The Watch / read tab checks titles against IMDb's free non-commercial datasets
 (https://datasets.imdbws.com): movies, TV movies, series and mini-series with a rating (~540k titles).
 ```
-python -m src.data_cleaner.imdb_load               # downloads to data/imdb/ (gitignored) if missing, then loads
+python -m src.data_cleaner.imdb_load               # downloads to DATA_DIR/raw/reference/imdb/ if missing, then loads
 python -m src.data_cleaner.imdb_load --download    # refresh with the latest files (~230 MB)
 python -m src.data_cleaner.watch_read_extract      # find titles in Watch / read posts
 ```
@@ -96,7 +119,7 @@ Instagram's image links expire, so the app shows pictures saved on this laptop:
 python -m src.data_scraper_downloads.fetch_thumbnails --tab recipes   # or travel, all, ...
 ```
 It opens each post's public embed page (no login) in headless Chrome and saves the cover image
-to `media/thumbnails/<code>.jpg` (gitignored). Posts removed from Instagram get a `.removed`
+to `DATA_DIR/derived/thumbnails/<code>.jpg`. Posts removed from Instagram get a `.removed`
 marker. Already-fetched posts are skipped, so run it again after each import.
 
 ### Refresh pipeline
@@ -110,7 +133,7 @@ One command runs every step in order; each step skips itself when there is nothi
 - In the app: sidebar **Data** → "Last updated", **🔄 Update now** (runs in the background with live step progress)
   and **📥 Request a new Instagram export** (date range per account + link to Instagram's download page).
 - Weekly (optional): `scripts/install_weekly_refresh.sh` adds a macOS launchd job for Sundays 9:00
-  (`--uninstall` removes it). Output goes to `logs/refresh.log` (gitignored).
+  (`--uninstall` removes it). Output goes to `DATA_DIR/logs/refresh.log`.
 
 ### The app
 
