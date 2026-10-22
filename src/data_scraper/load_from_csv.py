@@ -14,9 +14,10 @@ import pandas as pd
 from psycopg2.extras import execute_values
 
 from src.helper.mapping import reels_column_dtype, reels_column_transformations, transform_dtypes
+from src.helper import paths
 from src.helper.utils_db import connect_to_db
 
-DATA_DIR = os.path.dirname(__file__)
+DATA_DIR = str(paths.CSV_BACKUPS)  # DATA_DIR/raw/instagram/csv_backups_2024 (see src/helper/paths.py)
 POST_FILES = ["all_posts_2.csv", "all_posts.csv"]
 COLLECTION_FILE = "all_collections_2.csv"
 

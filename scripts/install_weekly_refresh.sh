@@ -5,13 +5,18 @@
 #   scripts/install_weekly_refresh.sh              # install / update the schedule
 #   scripts/install_weekly_refresh.sh --uninstall  # remove it
 #
-# Runs are logged in ops.pipeline_runs (triggered_by = 'schedule') and in logs/refresh.log.
+# Runs are logged in ops.pipeline_runs (triggered_by = 'schedule') and in $DATA_DIR/logs/refresh.log.
 set -euo pipefail
 
 LABEL="com.saved-instagram.refresh"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="$PROJECT_ROOT/.venv_data_cleaner/bin/python"
+# Data folder: DATA_DIR from .env, else the default in src/helper/paths.py
+DATA_DIR="$(grep -E '^DATA_DIR=' "$PROJECT_ROOT/.env" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+DATA_DIR="${DATA_DIR:-$HOME/Data/saved-instagram}"
+DATA_DIR="${DATA_DIR/#\~/$HOME}"
+LOG="$DATA_DIR/logs/refresh.log"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
     launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
@@ -21,7 +26,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
 fi
 
 [[ -x "$PYTHON" ]] || { echo "Missing $PYTHON (create .venv_data_cleaner first)"; exit 1; }
-mkdir -p "$PROJECT_ROOT/logs" "$HOME/Library/LaunchAgents"
+mkdir -p "$DATA_DIR/logs" "$HOME/Library/LaunchAgents"
 
 cat > "$PLIST" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -46,9 +51,9 @@ cat > "$PLIST" <<EOF
         <key>Minute</key><integer>0</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>$PROJECT_ROOT/logs/refresh.log</string>
+    <string>$LOG</string>
     <key>StandardErrorPath</key>
-    <string>$PROJECT_ROOT/logs/refresh.log</string>
+    <string>$LOG</string>
 </dict>
 </plist>
 EOF

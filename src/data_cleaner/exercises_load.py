@@ -6,7 +6,7 @@ Load free-exercise-db into reference.exercises (shown under "Load more exercises
 
 free-exercise-db: https://github.com/yuhonas/free-exercise-db (Unlicense / public domain), ~870 exercises
 with level, equipment, instructions, primary/secondary muscles and two photos each. Pinned to one commit
-so photo URLs stay stable; the JSON is saved in data/exercises/ (gitignored).
+so photo URLs stay stable; the JSON is saved in DATA_DIR/raw/reference/free-exercise-db/.
 """
 import argparse
 import json
@@ -14,14 +14,14 @@ import os
 import time
 import urllib.request
 
+from src.helper import paths
 from src.helper.model import engine
 from sqlalchemy import text
 
 COMMIT = "f00c92c7dcf1216a928a52c3706c7ce8e2f71ed5"
 JSON_URL = f"https://raw.githubusercontent.com/yuhonas/free-exercise-db/{COMMIT}/dist/exercises.json"
 IMAGE_BASE = f"https://raw.githubusercontent.com/yuhonas/free-exercise-db/{COMMIT}/exercises/"
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-JSON_PATH = os.path.join(PROJECT_ROOT, "data", "exercises", "exercises.json")
+JSON_PATH = str(paths.EXERCISES_DIR / "exercises.json")  # DATA_DIR/raw/reference/free-exercise-db
 
 
 def download():

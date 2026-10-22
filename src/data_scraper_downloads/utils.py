@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from src.helper import paths
 from bs4 import BeautifulSoup
 import glob
 import os
@@ -51,11 +53,8 @@ def get_soup_from_file_path(target_profile, saved_target="your_instagram_activit
     Returns:
     - BeautifulSoup: Parsed HTML content from the saved collections HTML file.
     """
-    # Get the list of profiles from the folder path
-    # Get the current script's directory
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    file_path = os.path.join(script_dir, 'downloaded')
+    # Exports live in DATA_DIR/raw/instagram/exports/<account>/ (see src/helper/paths.py)
+    file_path = str(paths.INSTAGRAM_EXPORTS / target_profile)
     print(file_path)
 
     # Export folders are named instagram-<profile>-<YYYY-MM-DD>-<id>, so sorting by name
@@ -76,9 +75,8 @@ def get_soup_from_file_path(target_profile, saved_target="your_instagram_activit
 
 
 def get_proxies():
-    # Define the path to the proxy file relative to the script's directory
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    proxy_file_path = os.path.join(script_dir, "proxy/proxies_us.txt")
+    # Proxy lists are local settings, kept in DATA_DIR/config/proxies (see src/helper/paths.py)
+    proxy_file_path = str(paths.PROXIES / "proxies_us.txt")
     
     try:
         # Read proxies from the file, ensuring no blank or invalid lines are included

@@ -6,7 +6,7 @@ Load IMDb movies and series into reference.imdb_titles, for matching titles in c
 
 Uses IMDb's non-commercial datasets (https://datasets.imdbws.com, personal/non-commercial use):
 title.basics.tsv.gz (titles, years, genres) and title.ratings.tsv.gz (ratings, votes),
-saved in data/imdb/ (gitignored). Only movies, TV movies, series and mini-series that have a
+saved in DATA_DIR/raw/reference/imdb/. Only movies, TV movies, series and mini-series that have a
 rating are kept. The table is replaced in one transaction.
 """
 import argparse
@@ -20,10 +20,10 @@ import sys
 import unicodedata
 import urllib.request
 
+from src.helper import paths
 from src.helper.model import engine
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-IMDB_DIR = os.path.join(PROJECT_ROOT, "data", "imdb")
+IMDB_DIR = str(paths.IMDB_DIR)  # DATA_DIR/raw/reference/imdb (see src/helper/paths.py)
 DATASET_URL = "https://datasets.imdbws.com/{}"
 FILES = ("title.basics.tsv.gz", "title.ratings.tsv.gz")
 KEEP_TYPES = {"movie", "tvMovie", "tvSeries", "tvMiniSeries"}

@@ -1,36 +1,44 @@
-.vscode
-*.json
+# Data lives outside the repo, in DATA_DIR (see src/helper/paths.py). These rules are a second line
+# of defence in case data files end up in the working copy anyway.
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+credentials.json
+api_key.json
+*.pem
+*.key
+
+# Data files (code, schemas and app assets are the only things committed)
+*.csv
+*.tsv
+*.tsv.gz
+*.zip
+*.ipynb
+*.sqlite
+*.dump
 output.txt
 properties.txt
-*.csv
-*.ipynb
-.env
+data/
+media/
+logs/
+src/data_scraper_downloads/downloaded/
+src/data_scraper_downloads/proxy/
 
-# Ignore Python bytecode
+# Local-only folders
+deleted/
+
+# Python
 __pycache__/
-
-# Ignore virtual environment directories
 .venv/
 .venv_data_cleaner/
 .venv_data_maps/
 
-# Ignore IDE-specific files
+# Editors and OS
 .vscode/
 .idea/
-
-.env.aws.bak
-
-# Personal data and local-only files
-src/data_scraper_downloads/downloaded/
-src/data_scraper_downloads/proxy/
-deleted/
 .DS_Store
 
-# Cached post thumbnails
-media/
-
-# Downloaded reference data (IMDb datasets)
-data/
-
-# Refresh logs
-logs/
+# Local tool settings (Claude Code launch config)
+.claude/
